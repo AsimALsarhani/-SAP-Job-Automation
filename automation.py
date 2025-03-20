@@ -39,11 +39,13 @@ try:
     )
     sign_in_button.click()
 
-    time.sleep(5)  # Wait for login to complete
+    # After signing in and navigating to the page where the Save button appears,
+    # use an explicit wait for the Save element.
+    wait = WebDriverWait(driver, 10)
+    save_button = wait.until(EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Save')]")))
 
-    # Click "Save" button (update the selector as needed)
-    save_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Save')]")
-    save_button.click()
+    # Optionally, you can click the Save button if needed:
+    # save_button.click()
 
     time.sleep(5)  # Wait for saving to complete
 
