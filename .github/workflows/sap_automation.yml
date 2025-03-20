@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4  # This step downloads your repo (important!)
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,4 +25,4 @@ jobs:
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-        run: python automation.py
+        run: python automation.py  # Make sure this file exists!
