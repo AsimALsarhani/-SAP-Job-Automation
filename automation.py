@@ -9,37 +9,43 @@ import os
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 
-# Setup WebDriver
-driver = webdriver.Chrome()
+# Setup Chrome options
+from selenium.webdriver.chrome.options import Options
+options = Options()
+options.add_argument("--headless")  # Run in headless mode
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--user-data-dir=/tmp/chrome-data")  # Use a unique temporary user data directory
+
+# Setup Chrome WebDriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 try:
-    # Open SAP SuccessFactors login page
+    # Open the SAP SuccessFactors login page
     driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true")
-
-    # Wait for page to load
-    time.sleep(5)
+    time.sleep(5)  # Wait for the page to load
 
     # Enter username and password
-    username_field = driver.find_element(By.ID, "username")  # Replace with actual ID
-    password_field = driver.find_element(By.ID, "password")  # Replace with actual ID
+    username_field = driver.find_element(By.ID, "username")  # Replace with actual field ID if different
+    password_field = driver.find_element(By.ID, "password")  # Replace with actual field ID if different
     username_field.send_keys(SAP_USERNAME)
     password_field.send_keys(SAP_PASSWORD)
 
-    # Click the "Sign In" button
+    # Click the "Sign In" button using XPath based on button text
     sign_in_button = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Sign In')]"))
     )
     sign_in_button.click()
 
-    # Wait for login to complete
-    time.sleep(5)
+    time.sleep(5)  # Wait for login to complete
 
-    # Click "Save" button (adjust selector if needed)
+    # Click "Save" button (update the selector as needed)
     save_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Save')]")
     save_button.click()
 
-    # Wait for save to complete
-    time.sleep(5)
+    time.sleep(5)  # Wait for saving to complete
 
     # Refresh page
     driver.refresh()
