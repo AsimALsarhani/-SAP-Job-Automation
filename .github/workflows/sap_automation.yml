@@ -3,7 +3,7 @@ name: SAP Job Automation
 on:
   schedule:
     - cron: "0 * * * *"  # Runs at the top of every hour
-  workflow_dispatch:  # Allows manual run
+  workflow_dispatch:
 
 jobs:
   run-automation:
@@ -26,5 +26,4 @@ jobs:
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-          # Ensure you also add any other secrets you need (if applicable)
         run: python automation.py
