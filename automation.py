@@ -1,6 +1,5 @@
 import time
 import os
-import schedule
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -15,24 +14,24 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# 🔹 EMAIL SETTINGS (Use your Gmail App Password here)
+# EMAIL SETTINGS (Use your Gmail App Password here)
 SENDER_EMAIL = "Mshtag1990@gmail.com"
 RECEIVER_EMAIL = "Asimalsarhani@gmail.com"
-EMAIL_PASSWORD = "IronMan@1990"  # Replace with your Gmail App Password
+EMAIL_PASSWORD = "YOUR_APP_PASSWORD"  # Replace with your Gmail App Password
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
-# 🔹 SAP LOGIN CREDENTIALS (stored as GitHub secrets/environment variables)
+# SAP LOGIN CREDENTIALS (provided via GitHub Secrets / Environment Variables)
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 
-# 🔹 Setup Chrome Options (Headless Mode)
+# Setup Chrome Options (Headless Mode)
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 
-# 🔹 Setup Chrome WebDriver
+# Setup Chrome WebDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 def automate_process():
@@ -43,7 +42,7 @@ def automate_process():
         time.sleep(5)  # Wait for the page to load
 
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Page loaded. Logging in...")
-        # 🔹 Enter Username & Password
+        # Enter Username & Password
         username_field = driver.find_element(By.ID, "username")
         password_field = driver.find_element(By.ID, "password")
         username_field.send_keys(SAP_USERNAME)
@@ -64,21 +63,24 @@ def automate_process():
         save_button.click()
         time.sleep(5)  # Wait for saving to complete
 
-        # 🔹 Take Screenshot as Proof
+        # Take Screenshot as Proof
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot taken.")
 
-        # 🔹 Send Email with the Screenshot Attachment
+        # Send Email with the Screenshot Attachment
         send_email_with_attachment(screenshot_path)
 
-        # 🔹 Refresh Page
+        # Refresh Page (if needed)
         driver.refresh()
         time.sleep(3)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Process completed in {time.time() - start_time:.2f} seconds.")
 
     except Exception as e:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error during automation: {e}")
+
+    finally:
+        driver.quit()
 
 def send_email_with_attachment(file_path):
     try:
@@ -112,13 +114,5 @@ def send_email_with_attachment(file_path):
     except Exception as e:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Email Error: {e}")
 
-def job():
-    automate_process()
-
-# Schedule the automation to run every hour
-schedule.every().hour.do(job)
-
-print("Automation running every hour... Press Ctrl+C to stop.")
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+# Run the automation process once
+automate_process()
