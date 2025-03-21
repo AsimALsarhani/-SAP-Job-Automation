@@ -25,7 +25,7 @@ SMTP_PORT = 465
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 
-# Setup Chrome Options (Headless Mode)
+# Setup Chrome Options (Headless Mode; remove headless if you want to debug interactively)
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--no-sandbox")
@@ -59,19 +59,27 @@ def automate_process():
         save_button = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Save')]"))
         )
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Save button found. Clicking Save...")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Save button found.")
+
+        # Take screenshot before clicking Save
+        before_click_path = "before_click.png"
+        driver.save_screenshot(before_click_path)
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot before clicking Save taken.")
+
+        # Click the Save button
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Clicking Save button...")
         save_button.click()
-        time.sleep(5)  # Wait for saving to complete
+        time.sleep(5)  # Wait for the click action to take effect
 
-        # Take Screenshot as Proof
-        screenshot_path = "screenshot.png"
-        driver.save_screenshot(screenshot_path)
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot taken.")
+        # Take screenshot after clicking Save
+        after_click_path = "after_click.png"
+        driver.save_screenshot(after_click_path)
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot after clicking Save taken.")
 
-        # Send Email with the Screenshot Attachment
-        send_email_with_attachment(screenshot_path)
+        # Send Email with the 'after_click' Screenshot
+        send_email_with_attachment(after_click_path)
 
-        # Refresh Page (if needed)
+        # Optional: Refresh Page
         driver.refresh()
         time.sleep(3)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Process completed in {time.time() - start_time:.2f} seconds.")
