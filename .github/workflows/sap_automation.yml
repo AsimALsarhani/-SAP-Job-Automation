@@ -2,7 +2,7 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs every hour
+    - cron: "0 * * * *"  # Runs at the top of every hour
   workflow_dispatch:  # Allows manual run
 
 jobs:
@@ -22,8 +22,9 @@ jobs:
         run: |
           pip install selenium webdriver-manager schedule
 
-      - name: Run Selenium script
+      - name: Run Automation Script
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          # Ensure you also add any other secrets you need (if applicable)
         run: python automation.py
