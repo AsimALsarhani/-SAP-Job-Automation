@@ -33,7 +33,7 @@ jobs:
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
         run: python automation.py
 
-      - name: Upload errors
+      - name: Upload errors  # Line 41 fix
         if: failure()
         uses: actions/upload-artifact@v4
         with:
