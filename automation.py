@@ -18,7 +18,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # EMAIL SETTINGS (Use your Gmail App Password here)
 SENDER_EMAIL = "Mshtag1990@gmail.com"
 RECEIVER_EMAIL = "Asimalsarhani@gmail.com"
-EMAIL_PASSWORD = "YOUR_APP_PASSWORD"  # Replace with your Gmail App Password
+EMAIL_PASSWORD = "ufkd knzp bqyb gjyg"  # Replace with your Gmail App Password
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
