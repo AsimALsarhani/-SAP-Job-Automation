@@ -12,21 +12,20 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # ✅ Correct version
+        uses: actions/checkout@v4  # ✅ Must be v4
 
       - name: Install Chrome
-        uses: actions/setup-chrome@v1  # ✅ Correct action name (NOT browser-actions)
+        uses: actions/setup-chrome@v1  # ✅ Official action (no "browser-" prefix)
         with:
           chrome-version: latest
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # ✅ Latest version
+        uses: actions/setup-python@v5  # ✅ Must be v5
         with:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          pip install selenium webdriver-manager
+        run: pip install selenium webdriver-manager
 
       - name: Run automation
         env:
@@ -36,7 +35,7 @@ jobs:
 
       - name: Upload errors
         if: failure()
-        uses: actions/upload-artifact@v4  # ✅ Updated to v4
+        uses: actions/upload-artifact@v4  # ✅ Must be v4
         with:
           name: error-screenshots
           path: *.png
