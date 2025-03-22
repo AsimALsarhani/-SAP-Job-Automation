@@ -36,15 +36,15 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 def login_to_sap():
     try:
         logger.info("Navigating to SAP login page.")
-        driver.get("https://your-sap-login-page-url.com")
+        driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
         
         # Wait for the username field to be visible and enter SAP username
-        username_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "SAP_USERNAME_ID")))  # Replace with actual ID
+        username_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "username")))  # Replace with actual ID if needed
         username_field.send_keys(SAP_USERNAME)
         logger.info("Entered SAP username.")
         
         # Wait for the password field to be visible and enter SAP password
-        password_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "SAP_PASSWORD_ID")))  # Replace with actual ID
+        password_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "password")))  # Replace with actual ID if needed
         password_field.send_keys(SAP_PASSWORD)
         logger.info("Entered SAP password.")
         
@@ -62,4 +62,70 @@ def login_to_sap():
 def wait_for_next_page():
     try:
         logger.info("Waiting for the next page to load.")
+        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "next_page_element_id")))  # Replace with actual ID
+        logger.info("Next page loaded.")
+    except Exception as e:
+        logger.error(f"Error while waiting for the next page: {e}")
+        driver.quit()
+        raise
+
+# Perform a specific SAP task after login
+def perform_sap_task():
+    try:
+        logger.info("Performing SAP task.")
         
+        # Replace with actual step to interact with SAP
+        task_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//button[@id='task_button_id']")))  # Adjust XPATH
+        task_button.click()
+        
+        logger.info("Task completed successfully.")
+        
+    except Exception as e:
+        logger.error(f"Error while performing SAP task: {e}")
+        driver.quit()
+        raise
+
+# Handle email login (if required)
+def login_to_email():
+    try:
+        logger.info("Logging into email.")
+        # Assuming you're using Gmail as an example
+        driver.get("https://mail.google.com")
+        
+        # Wait for the email input field, enter email password
+        email_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "identifierId")))
+        email_field.send_keys(SAP_USERNAME)
+        
+        next_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//div[@id='identifierNext']")))
+        next_button.click()
+        
+        # Wait for password field and enter password
+        password_field = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.NAME, "password")))
+        password_field.send_keys(EMAIL_PASSWORD)
+        
+        next_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//div[@id='passwordNext']")))
+        next_button.click()
+        
+        logger.info("Logged into email successfully.")
+        
+    except Exception as e:
+        logger.error(f"Error during email login: {e}")
+        driver.quit()
+        raise
+
+# Main function to orchestrate everything
+def main():
+    try:
+        login_to_sap()
+        wait_for_next_page()
+        perform_sap_task()
+        login_to_email()
+        
+    except Exception as e:
+        logger.error(f"Automation failed: {e}")
+    finally:
+        logger.info("Automation process completed.")
+        driver.quit()
+
+if __name__ == "__main__":
+    main()
