@@ -50,27 +50,32 @@ def automate_process():
         password_field.send_keys(SAP_PASSWORD)
 
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Clicking Sign In button...")
-        sign_in_button = WebDriverWait(driver, 10).until(
+        sign_in_button = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Sign In')]"))
         )
         sign_in_button.click()
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Sign In clicked.")
 
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting for Save button...")
-        save_button = WebDriverWait(driver, 10).until(
+        # Increase wait time if necessary
+        save_button = WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Save')]"))
         )
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Save button found.")
+
+        # Scroll Save button into view
+        driver.execute_script("arguments[0].scrollIntoView(true);", save_button)
+        time.sleep(2)  # Give time for scrolling
 
         # Take screenshot before clicking Save
         before_click_path = "before_click.png"
         driver.save_screenshot(before_click_path)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot before clicking Save taken.")
 
-        # Perform a double-click on the Save button
+        # Perform double-click on the Save button
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-clicking Save button...")
         actions = ActionChains(driver)
-        actions.double_click(save_button).perform()
+        actions.move_to_element(save_button).double_click().perform()
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-click action performed.")
 
         # Wait 50 seconds after clicking Save
@@ -79,10 +84,9 @@ def automate_process():
 
         # Click on a blank area near the top of the page
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Clicking on a blank area at the top of the page...")
-        # Find the <body> element and click near the top (offset 10, 10)
         body = driver.find_element(By.TAG_NAME, "body")
         ActionChains(driver).move_to_element_with_offset(body, 10, 10).click().perform()
-        time.sleep(3)  # Give time for any UI changes
+        time.sleep(3)  # Wait for any UI updates
 
         # Take screenshot after clicking blank area
         after_click_path = "after_click.png"
