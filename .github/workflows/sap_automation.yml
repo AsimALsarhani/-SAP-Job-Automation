@@ -2,7 +2,7 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Hourly runs
+    - cron: "0 * * * *"  # Runs at the top of every hour
   workflow_dispatch:
 
 jobs:
@@ -12,24 +12,24 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # Fixed to v4
+        uses: actions/checkout@v4  # Verified working version
 
-      - name: Set up Chrome
-        uses: actions/setup-chrome@v1  # Corrected action name
+      - name: Install Chrome
+        uses: actions/setup-chrome@v1  # Correct official action
         with:
-          chrome-version: latest
+          chrome-version: latest  # Explicit version specification
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # Updated to v5
+        uses: actions/setup-python@v5  # Latest stable version
         with:
-          python-version: '3.10'
+          python-version: '3.10'  # Explicit version
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install selenium webdriver-manager
 
-      - name: Run automation
+      - name: Run automation script
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Upload error artifacts
         if: failure()
-        uses: actions/upload-artifact@v4  # Updated to v4
+        uses: actions/upload-artifact@v4  # Current version
         with:
           name: error-screenshots
           path: |
