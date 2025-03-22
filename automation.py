@@ -59,7 +59,7 @@ def login_to_sap(driver):
             "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
             "div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
         )
-        username_field = WebDriverWait(driver, 60).until(
+        username_field = WebDriverWait(driver, 120).until(
             EC.visibility_of_element_located((By.XPATH, username_xpath))
         )
         logger.info("Username field located.")
@@ -71,7 +71,7 @@ def login_to_sap(driver):
             "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
             "div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
         )
-        password_field = WebDriverWait(driver, 60).until(
+        password_field = WebDriverWait(driver, 120).until(
             EC.visibility_of_element_located((By.XPATH, password_xpath))
         )
         logger.info("Password field located.")
@@ -80,7 +80,7 @@ def login_to_sap(driver):
 
         # Locate and click the login button
         login_button_xpath = "//button[@type='submit']"
-        login_button = WebDriverWait(driver, 60).until(
+        login_button = WebDriverWait(driver, 120).until(
             EC.element_to_be_clickable((By.XPATH, login_button_xpath))
         )
         logger.info("Login button is clickable.")
@@ -90,25 +90,25 @@ def login_to_sap(driver):
         # Wait for an element that indicates successful login.
         # Update 'success_xpath' to an element that reliably appears after login.
         success_xpath = "//div[@id='dashboard']"  # Example: change as needed
-        WebDriverWait(driver, 60).until(
+        WebDriverWait(driver, 120).until(
             EC.presence_of_element_located((By.XPATH, success_xpath))
         )
         logger.info("Logged in successfully.")
 
     except TimeoutException as te:
         logger.error("Timeout while waiting for an element during login.")
-        logger.error("Page source snippet: " + driver.page_source[:1000])
+        logger.error("Page source snippet: " + driver.page_source[:2000])  # Increased snippet length for more context
         driver.quit()
         raise te
     except NoSuchElementException as ne:
         logger.error(f"Element not found: {ne}")
-        logger.error("Page source snippet: " + driver.page_source[:1000])
+        logger.error("Page source snippet: " + driver.page_source[:2000])  # Increased snippet length for more context
         driver.quit()
         raise ne
     except Exception as e:
         logger.error(f"Error during SAP login process: {e}")
         try:
-            logger.error("Page source snippet: " + driver.page_source[:1000])
+            logger.error("Page source snippet: " + driver.page_source[:2000])  # Increased snippet length for more context
         except Exception:
             logger.error("Could not retrieve page source.")
         driver.quit()
