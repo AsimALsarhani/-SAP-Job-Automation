@@ -28,7 +28,7 @@ SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 
 # Setup Chrome Options (Headless Mode; remove headless for interactive debugging)
 options = Options()
-options.add_argument("--headless")
+# options.add_argument("--headless")  # Comment this line for debugging
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
 
@@ -56,16 +56,21 @@ def automate_process():
         sign_in_button.click()
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Sign In clicked.")
 
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting for Save button...")
-        # Increase wait time if necessary
-        save_button = WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Save')]"))
-        )
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Save button found.")
+        # Scroll to the bottom of the page
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Scrolling to the bottom of the page...")
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(3)  # Allow time for scrolling
 
-        # Scroll Save button into view
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting for Save button...")
+        save_button_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span"
+        
+        save_button = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.XPATH, save_button_xpath))
+        )
+
+        # Ensure visibility
         driver.execute_script("arguments[0].scrollIntoView(true);", save_button)
-        time.sleep(2)  # Give time for scrolling
+        time.sleep(2)  # Allow time for the button to be scrolled into view
 
         # Take screenshot before clicking Save
         before_click_path = "before_click.png"
@@ -73,10 +78,13 @@ def automate_process():
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot before clicking Save taken.")
 
         # Perform double-click on the Save button
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-clicking Save button...")
-        actions = ActionChains(driver)
-        actions.move_to_element(save_button).double_click().perform()
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-click action performed.")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Attempting to click Save button...")
+        try:
+            ActionChains(driver).move_to_element(save_button).double_click().perform()
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-click action performed.")
+        except:
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Regular click failed, using JavaScript...")
+            driver.execute_script("arguments[0].click();", save_button)
 
         # Wait 50 seconds after clicking Save
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting 50 seconds after clicking Save...")
