@@ -1,100 +1,80 @@
-import time
-import sys
 import os
+import time
+import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.alert import Alert
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
-# Read environment variables for sensitive data
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Retrieve credentials from environment variables (set these in your environment/CI secrets)
 SAP_USERNAME = os.getenv('SAP_USERNAME')
 SAP_PASSWORD = os.getenv('SAP_PASSWORD')
-EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Not used in this snippet but available if needed
 
-# Set up Chrome WebDriver with options
-chrome_options = Options()
-chrome_options.add_argument("--headless")  # Run Chrome in headless mode
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
+if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
+    logger.error("One or more required environment variables (SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD) are not set.")
+    raise ValueError("Missing credentials")
 
-# Initialize the Chrome WebDriver
-service = Service('/path/to/chromedriver')  # Ensure this path points to your chromedriver
-driver = webdriver.Chrome(service=service, options=chrome_options)
-
-def login_to_sap():
+def login_to_sap(driver):
     try:
-        # Navigate to SAP login page
-        driver.get("https://sap.example.com/login")
+        logger.info("Navigating to SAP login page.")
+        driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
 
-        # Find username field and enter the SAP username
-        username_field = driver.find_element(By.XPATH, "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input")
+        # Wait for the username field to be visible and enter SAP username
+        username_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
+        username_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, username_xpath)))
+        logger.info("Username field is visible.")
         username_field.send_keys(SAP_USERNAME)
-
-        # Find password field and enter the SAP password
-        password_field = driver.find_element(By.XPATH, "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]")
+        logger.info("Entered SAP username.")
+        
+        # Wait for the password field to be visible and enter SAP password
+        password_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
+        password_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, password_xpath)))
+        logger.info("Password field is visible.")
         password_field.send_keys(SAP_PASSWORD)
-
-        # Submit the login form
-        password_field.send_keys(Keys.RETURN)
-
-        # Wait for the login to complete and the main page to load
-        time.sleep(5)
-
+        logger.info("Entered SAP password.")
+        
+        # Wait for the login button and click it
+        login_button = WebDriverWait(driver, 60).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))
+        )
+        logger.info("Login button is clickable.")
+        login_button.click()
+        logger.info("Clicked on the login button.")
+        
+        # Wait for a successful login indication (example: dashboard element)
+        WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, "//div[@id='dashboard']")))
+        logger.info("Logged in successfully.")
+        
     except Exception as e:
-        print(f"Error during SAP login: {e}")
+        logger.error(f"Error during SAP login process: {e}")
         driver.quit()
-        sys.exit(1)
-
-def perform_task_in_sap():
-    try:
-        # Example: Locate a specific SAP element and interact with it
-        task_button = driver.find_element(By.XPATH, "/path/to/task/button")
-        task_button.click()
-
-        # Handle any alerts that pop up
-        try:
-            alert = Alert(driver)
-            alert.accept()  # Accept the alert if it appears
-        except:
-            pass
-
-        # Wait for the task to complete (this could vary depending on the task you're automating)
-        time.sleep(10)
-
-    except Exception as e:
-        print(f"Error performing task in SAP: {e}")
-        driver.quit()
-        sys.exit(1)
-
-def logout_from_sap():
-    try:
-        # Example: Find the logout button and click it
-        logout_button = driver.find_element(By.XPATH, "/path/to/logout/button")
-        logout_button.click()
-
-        # Wait for the logout to complete
-        time.sleep(3)
-
-    except Exception as e:
-        print(f"Error logging out from SAP: {e}")
-        driver.quit()
-        sys.exit(1)
+        raise
 
 def main():
-    # Step 1: Log in to SAP
-    login_to_sap()
-
-    # Step 2: Perform the task in SAP
-    perform_task_in_sap()
-
-    # Step 3: Log out from SAP
-    logout_from_sap()
-
-    # Step 4: Close the browser after completing the task
-    driver.quit()
+    # Set up Chrome options
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run headless; set to False if you want to see the browser
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    # Use webdriver_manager to automatically install and manage chromedriver
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    
+    try:
+        login_to_sap(driver)
+    finally:
+        driver.quit()
+        logger.info("WebDriver closed.")
 
 if __name__ == "__main__":
     main()
