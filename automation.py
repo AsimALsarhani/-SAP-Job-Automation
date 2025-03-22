@@ -1,84 +1,80 @@
-import os
-import logging
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+Skip to content
+Navigation Menu
+AsimALsarhani
+-SAP-Job-Automation
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+Type / to search
+Code
+Issues
+Pull requests
+Actions
+Projects
+Security
+Insights
+Settings
+SAP Job Automation
+SAP Job Automation #68
+Jobs
+Run details
+Annotations
+1 error
+run-automation
+failed 1 minute ago in 43s
+Search logs
+1s
+1s
+0s
+3s
+35s
+Run python automation.py
+  python automation.py
+  shell: /usr/bin/bash -e {0}
+  env:
+    pythonLocation: /opt/hostedtoolcache/Python/3.9.21/x64
+    PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.9.21/x64/lib/pkgconfig
+    Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.21/x64
+    Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.21/x64
+    Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.9.21/x64
+    LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.9.21/x64/lib
+    SAP_USERNAME: ***
+    SAP_PASSWORD: ***
+    EMAIL_PASSWORD: ***
+INFO:WDM:====== WebDriver manager ======
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:There is no [linux64] chromedriver "134.0.6998.165" for browser google-chrome "134.0.6998" in cache
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:WebDriver version 134.0.6998.165 selected
+INFO:WDM:Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/134.0.6998.165/linux64/chromedriver-linux64.zip
+INFO:WDM:About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/134.0.6998.165/linux64/chromedriver-linux64.zip
+INFO:WDM:Driver downloading response is 200
+INFO:WDM:Get LATEST chromedriver version for google-chrome
+INFO:WDM:Driver has been saved in cache [/home/runner/.wdm/drivers/chromedriver/linux64/134.0.6998.165]
+INFO:__main__:Navigating to SAP login page.
+ERROR:__main__:Login failed: Message: 
+Stacktrace:
+#0 0x56264be70ffa <unknown>
+#1 0x56264b92f970 <unknown>
+#2 0x56264b981385 <unknown>
+#3 0x56264b9815b1 <unknown>
+#4 0x56264b9d03c4 <unknown>
+#5 0x56264b9a72bd <unknown>
+#6 0x56264b9cd70c <unknown>
+#7 0x56264b9a7063 <unknown>
+#8 0x56264b973328 <unknown>
+#9 0x56264b974491 <unknown>
+#10 0x56264be3842b <unknown>
+#11 0x56264be3c2ec <unknown>
+#12 0x56264be1fa22 <unknown>
+#13 0x56264be3ce64 <unknown>
+#14 0x56264be03bef <unknown>
+#15 0x56264be5f558 <unknown>
+#16 0x56264be5f736 <unknown>
+#17 0x56264be6fe76 <unknown>
+#18 0x7f6d4829caa4 <unknown>
+#19 0x7f6d48329c3c <unknown>
 
-# Retrieve credentials from environment variables
-SAP_USERNAME = os.getenv("SAP_USERNAME")
-SAP_PASSWORD = os.getenv("SAP_PASSWORD")
-
-if not SAP_USERNAME or not SAP_PASSWORD:
-    logger.error("Missing required credentials.")
-    raise ValueError("SAP credentials are missing.")
-
-def login_to_sap(driver):
-    try:
-        logger.info("Navigating to SAP login page.")
-        driver.get("https://career23.sapsf.com/career?career_company=saudiara05")
-
-        username_xpath = "//input[@name='username']"
-        password_xpath = "//input[@name='password']"
-        login_button_xpath = "//button[@type='submit']"
-
-        # Wait for the username field and enter SAP username
-        username_field = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, username_xpath))
-        )
-        username_field.send_keys(SAP_USERNAME)
-        logger.info("Entered SAP username.")
-
-        # Wait for the password field and enter SAP password
-        password_field = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, password_xpath))
-        )
-        password_field.send_keys(SAP_PASSWORD)
-        logger.info("Entered SAP password.")
-
-        # Click the login button
-        login_button = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.XPATH, login_button_xpath))
-        )
-        login_button.click()
-        logger.info("Clicked on login button.")
-
-        # Wait for login success confirmation
-        WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@id='dashboard']"))
-        )
-        logger.info("Successfully logged in.")
-
-    except Exception as e:
-        logger.error(f"Login failed: {e}")
-        driver.quit()
-        raise
-
-def main():
-    # Set up Chrome options
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Runs in headless mode (remove if debugging)
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--remote-debugging-port=9222")  # Prevents user-data-dir issue
-
-    # Use WebDriver Manager to manage ChromeDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-
-    try:
-        login_to_sap(driver)
-    finally:
-        driver.quit()
-        logger.info("WebDriver session closed.")
-
-if __name__ == "__main__":
-    main()
+WARNING:urllib3.connectionpool:Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f5e49883490>: Failed to establish a new connection: [Errno 111] Connection refused')': /session/46103d82471dbd8a72a9bfac93bdc607
+0s
+0s
+0s
