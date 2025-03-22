@@ -40,7 +40,7 @@ def login_to_sap(driver):
         driver.get(sap_url)
         logging.info(f"Loaded SAP URL: {sap_url}")
 
-        # Wait for critical elements with multiple fallbacks
+        # Wait for the page to fully load
         WebDriverWait(driver, 30).until(
             lambda d: d.execute_script('return document.readyState') == 'complete'
         )
