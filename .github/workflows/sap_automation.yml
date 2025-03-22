@@ -1,30 +1,34 @@
-name: SAP Job Automation
+name: SAP Automation
 
 on:
-  schedule:
-    - cron: "0 * * * *"  # Runs every hour at the top of the hour
   workflow_dispatch:
 
 jobs:
-  run-automation:
+  sap_automation_job:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
-
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
-
-      - name: Install Dependencies
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
         run: |
           pip install selenium webdriver-manager python-dotenv
-
-      - name: Run Automation Script
+      
+      - name: Run automation script
         env:
-          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
-          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          # Add any environment variables you need here
         run: python automation.py
