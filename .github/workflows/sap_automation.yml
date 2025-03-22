@@ -26,4 +26,5 @@ jobs:
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: python automation.py
