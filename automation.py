@@ -14,10 +14,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Retrieve credentials from environment variables (set these in your environment/CI secrets)
-SAP_USERNAME = os.getenv('SAP_USERNAME')
-SAP_PASSWORD = os.getenv('SAP_PASSWORD')
-EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Not used in this snippet but available if needed
+# Retrieve credentials from environment variables
+SAP_USERNAME = os.getenv("SAP_USERNAME")
+SAP_PASSWORD = os.getenv("SAP_PASSWORD")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
     logger.error("One or more required environment variables (SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD) are not set.")
@@ -27,17 +27,21 @@ def login_to_sap(driver):
     try:
         logger.info("Navigating to SAP login page.")
         driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
-
-        # Wait for the username field to be visible and enter SAP username
+        
+        # Wait for the username field using the provided XPath
         username_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
-        username_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, username_xpath)))
+        username_field = WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located((By.XPATH, username_xpath))
+        )
         logger.info("Username field is visible.")
         username_field.send_keys(SAP_USERNAME)
         logger.info("Entered SAP username.")
         
-        # Wait for the password field to be visible and enter SAP password
+        # Wait for the password field using the provided XPath
         password_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
-        password_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, password_xpath)))
+        password_field = WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located((By.XPATH, password_xpath))
+        )
         logger.info("Password field is visible.")
         password_field.send_keys(SAP_PASSWORD)
         logger.info("Entered SAP password.")
@@ -51,7 +55,9 @@ def login_to_sap(driver):
         logger.info("Clicked on the login button.")
         
         # Wait for a successful login indication (example: dashboard element)
-        WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, "//div[@id='dashboard']")))
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@id='dashboard']"))
+        )
         logger.info("Logged in successfully.")
         
     except Exception as e:
@@ -62,11 +68,11 @@ def login_to_sap(driver):
 def main():
     # Set up Chrome options
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run headless; set to False if you want to see the browser
+    chrome_options.headless = True  # Set to False for debugging (visible browser)
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     
-    # Use webdriver_manager to automatically install and manage chromedriver
+    # Use webdriver_manager to automatically manage chromedriver
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
