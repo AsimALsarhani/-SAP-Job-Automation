@@ -1,1 +1,3 @@
-python -m pip install schedule
+selenium
+webdriver-manager
+schedule
