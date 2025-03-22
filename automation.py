@@ -31,7 +31,7 @@ driver.maximize_window()
 
 try:
     # Open SAP webpage
-    driver.get("https://your-sap-url.com")  # Replace with the correct SAP URL
+    driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")  # Replace with the correct SAP URL
 
     # Log in (Using the same SAP login field IDs as before)
     username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "j_username")))
