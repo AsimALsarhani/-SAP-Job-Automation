@@ -3,97 +3,75 @@ import time
 import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Setup logging with timestamps
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Retrieve credentials from environment variables
-SAP_USERNAME = os.getenv("SAP_USERNAME")
-SAP_PASSWORD = os.getenv("SAP_PASSWORD")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # (Available for further use if needed)
+# SAP SuccessFactors login URL
+SAP_URL = 'https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg='
 
-if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
-    logger.error("Missing required environment variables: SAP_USERNAME, SAP_PASSWORD, or EMAIL_PASSWORD")
-    raise ValueError("Missing credentials")
+# Credentials (ensure these are set in your environment variables)
+SAP_USERNAME = os.getenv('SAP_USERNAME')
+SAP_PASSWORD = os.getenv('SAP_PASSWORD')
+
+def setup_driver():
+    """Set up the Chrome WebDriver."""
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')  # Run in headless mode
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    return driver
 
 def login_to_sap(driver):
+    """Perform login to SAP SuccessFactors."""
     try:
-        logger.info("Navigating to SAP login page.")
-        url = ("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
-               "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
-        driver.get(url)
-        time.sleep(5)  # Allow page to load
+        driver.get(SAP_URL)
+        logger.info('Navigated to SAP login page.')
 
-        logger.info("Page title: " + driver.title)
-        
-        # Use robust XPath selectors that ignore namespace prefixes
-        username_xpath = ("//*[local-name()='ajaxinclude']/*[local-name()='ajaxinclude']/div[2]/div[2]/div/form/"
-                          "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input")
-        username_field = WebDriverWait(driver, 60).until(
-            EC.visibility_of_element_located((By.XPATH, username_xpath))
+        # Wait for the username field to be present and enter the username
+        username_field = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.NAME, 'username'))
         )
-        logger.info("Username field located.")
         username_field.send_keys(SAP_USERNAME)
-        logger.info("SAP username entered.")
-        
-        password_xpath = ("//*[local-name()='ajaxinclude']/*[local-name()='ajaxinclude']/div[2]/div[2]/div/form/"
-                          "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]")
-        password_field = WebDriverWait(driver, 60).until(
-            EC.visibility_of_element_located((By.XPATH, password_xpath))
-        )
-        logger.info("Password field located.")
+        logger.info('Entered username.')
+
+        # Enter the password
+        password_field = driver.find_element(By.NAME, 'password')
         password_field.send_keys(SAP_PASSWORD)
-        logger.info("SAP password entered.")
-        
-        # Wait for the login button to be clickable and click it
-        login_button_xpath = "//button[@type='submit']"
-        login_button = WebDriverWait(driver, 60).until(
-            EC.element_to_be_clickable((By.XPATH, login_button_xpath))
-        )
-        logger.info("Login button is clickable.")
+        logger.info('Entered password.')
+
+        # Click the login button
+        login_button = driver.find_element(By.XPATH, '//button[@type="submit"]')
         login_button.click()
-        logger.info("Clicked on the login button.")
-        
-        # Wait for an element that confirms successful login (update this XPath as needed)
-        success_xpath = "//div[@id='dashboard']"
-        WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, success_xpath))
+        logger.info('Clicked login button.')
+
+        # Wait for the login to complete by checking for a post-login element
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.ID, 'post-login-element-id'))  # Replace with actual element ID
         )
-        logger.info("Logged in successfully.")
-        
+        logger.info('Login successful.')
+
+    except TimeoutException:
+        logger.error('Login failed: Timeout while waiting for page elements.')
+    except NoSuchElementException as e:
+        logger.error(f'Login failed: Element not found. {e}')
     except Exception as e:
-        logger.error(f"Error during SAP login process: {e}")
-        # Log a snippet of the page source for diagnostics
-        try:
-            logger.error("Page source snippet: " + driver.page_source[:1000])
-        except Exception:
-            logger.error("Could not retrieve page source.")
-        driver.quit()
-        raise
+        logger.error(f'An unexpected error occurred during login: {e}')
 
 def main():
-    # Set up Chrome options
-    chrome_options = Options()
-    chrome_options.headless = True  # Set to False for debugging (visible browser)
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    
-    # Use webdriver_manager to automatically manage chromedriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
+    driver = setup_driver()
     try:
         login_to_sap(driver)
+        # Add further automation steps here
     finally:
         driver.quit()
-        logger.info("WebDriver closed.")
+        logger.info('WebDriver session closed.')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
