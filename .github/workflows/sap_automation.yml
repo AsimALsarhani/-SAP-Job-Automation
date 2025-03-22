@@ -2,7 +2,7 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs hourly
+    - cron: "0 * * * *"  # Hourly runs
   workflow_dispatch:
 
 jobs:
@@ -12,15 +12,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # ✅ Latest stable version
+        uses: actions/checkout@v4  # Fixed to v4
 
       - name: Set up Chrome
-        uses: actions/setup-chrome@v1  # ✅ Correct action name
+        uses: actions/setup-chrome@v1  # Corrected action name
         with:
           chrome-version: latest
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5  # ✅ Latest version
+      - name: Set up Python
+        uses: actions/setup-python@v5  # Updated to v5
         with:
           python-version: '3.10'
 
@@ -33,12 +33,11 @@ jobs:
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-        run: |
-          python automation.py || (echo "Process failed"; exit 1)
+        run: python automation.py
 
-      - name: Upload screenshots on failure
+      - name: Upload error artifacts
         if: failure()
-        uses: actions/upload-artifact@v4  # ✅ Updated to v4
+        uses: actions/upload-artifact@v4  # Updated to v4
         with:
           name: error-screenshots
           path: |
