@@ -1,44 +1,30 @@
-name: SAP Automation
+name: SAP Job Automation
 
 on:
+  schedule:
+    - cron: "0 * * * *"  # Runs every hour at the top of the hour
   workflow_dispatch:
 
 jobs:
-  sap_automation_job:
+  run-automation:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
-      
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      
-      - name: Install dependencies
-        run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install selenium webdriver-manager python-dotenv
-      
-      - name: Run linting
-        run: |
-          pip install flake8
-          flake8 --max-line-length=88 --ignore=E203,W503 .
-      
-      - name: Run automation script
-        run: python automation.py
 
-      - name: Notify on failure
-        if: failure()
+      - name: Install Dependencies
         run: |
-          echo "The workflow failed, please check the logs."
-          # Add notification code here (e.g., send an email or Slack message)
+          pip install selenium webdriver-manager python-dotenv
+
+      - name: Run Automation Script
+        env:
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python automation.py
