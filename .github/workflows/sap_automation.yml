@@ -2,32 +2,44 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs at the top of every hour
+    - cron: "0 * * * *"  # Hourly runs
   workflow_dispatch:
 
 jobs:
-  run-automation:
+  automate-sap:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: latest
+
+      - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
-      - name: Install Chrome  # Add this step to install Chrome
-        uses: browser-actions/setup-chrome@v1
-
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          pip install selenium webdriver-manager schedule
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager
 
-      - name: Run Automation Script
+      - name: Run automation
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-        run: python automation.py
+        run: |
+          python automation.py || (echo "Process failed"; exit 1)
+        
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: error-screenshots
+          path: |
+            *.png
