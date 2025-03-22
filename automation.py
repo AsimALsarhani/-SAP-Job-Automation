@@ -28,9 +28,15 @@ chrome_options = Options()
 chrome_options.add_argument("--headless")  # Running headless (no browser UI)
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--remote-debugging-port=9222")  # Enable debugging port for connection issues
 
 # Set up Chrome WebDriver
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+try:
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    logger.info("WebDriver initialized successfully.")
+except Exception as e:
+    logger.error(f"Failed to initialize WebDriver: {e}")
+    exit(1)
 
 # Open the SAP Login page
 def login_to_sap():
