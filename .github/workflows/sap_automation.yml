@@ -26,9 +26,19 @@ jobs:
       
       - name: Install dependencies
         run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install selenium webdriver-manager python-dotenv
       
+      - name: Run linting
+        run: |
+          pip install flake8
+          flake8 --max-line-length=88 --ignore=E203,W503 .
+      
       - name: Run automation script
-        env:
-          # Add any environment variables you need here
         run: python automation.py
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "The workflow failed, please check the logs."
+          # Add notification code here (e.g., send an email or Slack message)
