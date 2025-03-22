@@ -32,11 +32,4 @@ def login_to_sap(driver):
         logger.info("Entered SAP username.")
         
         # Wait for the password field to be visible and enter SAP password
-        password_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
-        password_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, password_xpath)))
-        logger.info("Password field is visible.")
-        password_field.send_keys(SAP_PASSWORD)
-        logger.info("Entered SAP password.")
-        
-        # Wait for the login button and click it
-    
+        password_xpath = "/html/body/a
