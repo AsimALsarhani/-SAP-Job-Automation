@@ -12,12 +12,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
 # EMAIL SETTINGS (Use your Gmail App Password here)
 SENDER_EMAIL = "Mshtag1990@gmail.com"
 RECEIVER_EMAIL = "Asimalsarhani@gmail.com"
-EMAIL_PASSWORD = "ufkd knzp bqyb gjyg"  # Replace with your Gmail App Password
+EMAIL_PASSWORD = "YOUR_APP_PASSWORD"  # Replace with your Gmail App Password
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
@@ -25,7 +26,7 @@ SMTP_PORT = 465
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 
-# Setup Chrome Options (Headless Mode; remove headless if you want to debug interactively)
+# Setup Chrome Options (Headless Mode; remove headless for interactive debugging)
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--no-sandbox")
@@ -66,22 +67,31 @@ def automate_process():
         driver.save_screenshot(before_click_path)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot before clicking Save taken.")
 
-        # Click the Save button
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Clicking Save button...")
-        save_button.click()
-        time.sleep(5)  # Wait for the click action to take effect
+        # Perform a double-click on the Save button
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-clicking Save button...")
+        actions = ActionChains(driver)
+        actions.double_click(save_button).perform()
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Double-click action performed.")
 
-        # Take screenshot after clicking Save
+        # Wait 50 seconds after clicking Save
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Waiting 50 seconds after clicking Save...")
+        time.sleep(50)
+
+        # Click on a blank area near the top of the page
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Clicking on a blank area at the top of the page...")
+        # Find the <body> element and click near the top (offset 10, 10)
+        body = driver.find_element(By.TAG_NAME, "body")
+        ActionChains(driver).move_to_element_with_offset(body, 10, 10).click().perform()
+        time.sleep(3)  # Give time for any UI changes
+
+        # Take screenshot after clicking blank area
         after_click_path = "after_click.png"
         driver.save_screenshot(after_click_path)
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot after clicking Save taken.")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Screenshot after clicking blank area taken.")
 
-        # Send Email with the 'after_click' Screenshot
-        send_email_with_attachment(after_click_path)
+        # Send Email with both screenshots attached
+        send_email_with_attachments([before_click_path, after_click_path])
 
-        # Optional: Refresh Page
-        driver.refresh()
-        time.sleep(3)
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Process completed in {time.time() - start_time:.2f} seconds.")
 
     except Exception as e:
@@ -90,26 +100,28 @@ def automate_process():
     finally:
         driver.quit()
 
-def send_email_with_attachment(file_path):
+def send_email_with_attachments(file_paths):
     try:
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Preparing email with screenshot...")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Preparing email with screenshots...")
         message = MIMEMultipart()
         message["From"] = SENDER_EMAIL
         message["To"] = RECEIVER_EMAIL
-        message["Subject"] = "SAP Automation Proof - Screenshot Attached"
+        message["Subject"] = "SAP Automation Proof - Screenshots Attached"
         body = ("Hello,\n\n"
-                "Please find attached the screenshot as proof that the SAP automation ran successfully.\n\n"
+                "Please find attached the screenshots as proof that the SAP automation ran successfully.\n\n"
                 "Best Regards,\n"
                 "Your Automation Script")
         message.attach(MIMEText(body, "plain"))
 
-        # Attach the screenshot file
-        with open(file_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f"attachment; filename={os.path.basename(file_path)}")
-            message.attach(part)
+        # Attach each screenshot
+        for file_path in file_paths:
+            with open(file_path, "rb") as attachment:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", f"attachment; filename={os.path.basename(file_path)}")
+                message.attach(part)
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Attached {os.path.basename(file_path)}")
 
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Connecting to SMTP server...")
         context = ssl.create_default_context()
@@ -117,7 +129,7 @@ def send_email_with_attachment(file_path):
             print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Logging into SMTP server...")
             server.login(SENDER_EMAIL, EMAIL_PASSWORD)
             server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, message.as_string())
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Email sent successfully!")
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Email sent successfully with both screenshots!")
 
     except Exception as e:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Email Error: {e}")
