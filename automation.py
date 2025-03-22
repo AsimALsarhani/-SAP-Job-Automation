@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-import tempfile
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -15,7 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Retrieve credentials from environment variables
+# Retrieve credentials from environment variables (set these in your environment or CI/CD secrets)
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # Not used in this snippet but available if needed
@@ -29,16 +28,22 @@ def login_to_sap(driver):
         logger.info("Navigating to SAP login page.")
         driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
         
-        # Wait for the username field to be visible and enter SAP username
-        username_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
-        username_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, username_xpath)))
+        # Wait for the username field and enter SAP username using the provided XPath
+        username_xpath = ("/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
+                          "div/div[2]/div/div/table/tbody/tr[1]/td[2]/input")
+        username_field = WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located((By.XPATH, username_xpath))
+        )
         logger.info("Username field is visible.")
         username_field.send_keys(SAP_USERNAME)
         logger.info("Entered SAP username.")
         
-        # Wait for the password field to be visible and enter SAP password
-        password_xpath = "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
-        password_field = WebDriverWait(driver, 60).until(EC.visibility_of_element_located((By.XPATH, password_xpath)))
+        # Wait for the password field and enter SAP password using the provided XPath
+        password_xpath = ("/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
+                          "div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]")
+        password_field = WebDriverWait(driver, 60).until(
+            EC.visibility_of_element_located((By.XPATH, password_xpath))
+        )
         logger.info("Password field is visible.")
         password_field.send_keys(SAP_PASSWORD)
         logger.info("Entered SAP password.")
@@ -51,7 +56,7 @@ def login_to_sap(driver):
         login_button.click()
         logger.info("Clicked on the login button.")
         
-        # Wait for a successful login indication (example: dashboard element)
+        # Wait for an element that indicates a successful login (update this XPath as needed)
         WebDriverWait(driver, 60).until(
             EC.presence_of_element_located((By.XPATH, "//div[@id='dashboard']"))
         )
@@ -63,17 +68,13 @@ def login_to_sap(driver):
         raise
 
 def main():
-    # Set up Chrome options
+    # Set up Chrome options without forcing a user data directory
     chrome_options = Options()
-    chrome_options.headless = True  # Change to False for debugging (visible browser)
+    chrome_options.headless = True  # Set to False for debugging
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     
-    # Create a unique temporary user data directory to avoid conflicts
-    temp_dir = tempfile.mkdtemp()
-    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-    
-    # Use webdriver_manager to automatically manage the chromedriver
+    # Use webdriver_manager to automatically manage the chromedriver version
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
