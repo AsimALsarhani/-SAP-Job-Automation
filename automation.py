@@ -9,7 +9,6 @@ from email.mime.text import MIMEText
 from email import encoders
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Retrieve credentials from environment variables
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # For mshtag1990@gmail.com
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
     logger.error("Missing required environment variables: SAP_USERNAME, SAP_PASSWORD, or EMAIL_PASSWORD")
