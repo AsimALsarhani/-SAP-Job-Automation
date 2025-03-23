@@ -15,51 +15,54 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# Configure logging
+# Configure logging with timestamps
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Retrieve credentials from environment variables
 SAP_USERNAME = os.getenv("SAP_USERNAME")
 SAP_PASSWORD = os.getenv("SAP_PASSWORD")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # Password for mshtag1990@gmail.com
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # For mshtag1990@gmail.com
 
 if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
     logger.error("Missing one or more required environment variables: SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD")
     raise ValueError("Missing credentials")
 
 # SAP SuccessFactors login URL (provided)
-SAP_URL = ("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
-           "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=")
+SAP_URL = (
+    "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
+    "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg="
+)
 
 def setup_driver():
     """
     Set up the Chrome WebDriver using webdriver_manager.
-    No user-data-dir is specified so Chrome uses its default temporary profile.
-    The incognito flag forces a fresh session.
+    Uses the --incognito flag to force a fresh session and avoids specifying a fixed user-data-dir.
     """
     chrome_options = Options()
-    chrome_options.headless = True  # Change to False for debugging
+    chrome_options.headless = True  # Set to False for debugging (visible browser)
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--incognito")  # Force fresh session
+    chrome_options.add_argument("--incognito")  # Use incognito mode for a fresh session
     
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 def login_to_sap(driver):
-    """Log in to the SAP SuccessFactors portal."""
+    """Log in to the SAP SuccessFactors portal using explicit waits and detailed logging."""
     try:
         logger.info("Navigating to SAP login page.")
         driver.get(SAP_URL)
-        time.sleep(5)  # Allow page to load
-        
+        time.sleep(5)  # Allow the page to load
+
         logger.info("Page title: " + driver.title)
         
-        # Locate the username field (update XPath if needed)
-        username_xpath = ("/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/"
-                          "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input")
+        # XPath for the username field (update if necessary)
+        username_xpath = (
+            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
+            "div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
+        )
         username_field = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.XPATH, username_xpath))
         )
@@ -67,9 +70,11 @@ def login_to_sap(driver):
         username_field.send_keys(SAP_USERNAME)
         logger.info("Entered SAP username.")
         
-        # Locate the password field (update XPath if needed)
-        password_xpath = ("/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/"
-                          "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]")
+        # XPath for the password field (update if necessary)
+        password_xpath = (
+            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
+            "div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
+        )
         password_field = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.XPATH, password_xpath))
         )
@@ -77,7 +82,7 @@ def login_to_sap(driver):
         password_field.send_keys(SAP_PASSWORD)
         logger.info("Entered SAP password.")
         
-        # Locate and click the login button (update XPath if needed)
+        # XPath for the login button (update if necessary)
         login_button_xpath = "//button[@type='submit']"
         login_button = WebDriverWait(driver, 60).until(
             EC.element_to_be_clickable((By.XPATH, login_button_xpath))
@@ -86,8 +91,8 @@ def login_to_sap(driver):
         login_button.click()
         logger.info("Clicked on the login button.")
         
-        # Optionally, wait for an element that confirms successful login (update this as needed)
-        success_xpath = "//div[@id='dashboard']"  # Update with a unique element after login
+        # Wait for an element that confirms successful login (update this XPath to a reliable element on your SAP page)
+        success_xpath = "//div[@id='dashboard']"
         WebDriverWait(driver, 60).until(
             EC.presence_of_element_located((By.XPATH, success_xpath))
         )
@@ -114,49 +119,45 @@ def login_to_sap(driver):
 
 def perform_actions(driver):
     """
-    After login, perform the following actions:
-    - Wait 50 seconds.
-    - Scroll down to the bottom and click the "Save" button.
-    - Wait 55 seconds.
-    - Scroll up to the top and click on a blank white area.
-    - Wait 10 seconds.
-    - Take a screenshot.
+    After login, perform the following steps:
+      1. Wait 50 seconds.
+      2. Scroll down to the bottom of the page and click the "Save" button.
+      3. Wait 55 seconds.
+      4. Scroll up to the top and click on a blank white area.
+      5. Wait 10 seconds.
     """
     try:
-        # Wait 50 seconds after login
-        logger.info("Waiting for 50 seconds after login.")
+        logger.info("Waiting 50 seconds after login.")
         time.sleep(50)
         
-        # Scroll to the bottom of the page
-        logger.info("Scrolling to the bottom of the page.")
+        # Scroll down to the bottom of the page
+        logger.info("Scrolling down to the bottom of the page.")
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
         
-        # Click the "Save" button (update the selector as needed)
+        # Click the "Save" button (update selector as needed)
         save_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(),'Save')]"))
         )
-        logger.info("Save button located and clickable.")
+        logger.info("Save button located.")
         save_button.click()
         logger.info("Clicked on the Save button.")
         
-        # Wait 55 seconds after clicking Save
-        logger.info("Waiting for 55 seconds after clicking Save.")
+        logger.info("Waiting 55 seconds after clicking Save.")
         time.sleep(55)
         
-        # Scroll back up to the top
-        logger.info("Scrolling back to the top of the page.")
+        # Scroll back up to the top of the page
+        logger.info("Scrolling up to the top of the page.")
         driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
         
-        # Click on a blank area (we use the <body> element as the blank area)
+        # Click on a blank area - using the body element as a fallback
         blank_area = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.TAG_NAME, "body"))
         )
         blank_area.click()
         logger.info("Clicked on a blank area at the top of the page.")
         
-        # Wait 10 seconds before taking a screenshot
         logger.info("Waiting 10 seconds before taking a screenshot.")
         time.sleep(10)
         
@@ -178,7 +179,8 @@ def take_screenshot(driver, file_path="screenshot.png"):
 def send_email(screenshot_path, sender_email="mshtag1990@gmail.com", receiver_email="asimalsarhani@gmail.com"):
     """
     Send an email with the screenshot attached.
-    This uses SMTP_SSL with Gmail.
+    This example uses Gmail's SMTP_SSL.
+    Ensure that 'EMAIL_PASSWORD' corresponds to the sender's (mshtag1990@gmail.com) app password.
     """
     try:
         msg = MIMEMultipart()
@@ -188,9 +190,9 @@ def send_email(screenshot_path, sender_email="mshtag1990@gmail.com", receiver_em
         body = "Attached is the screenshot from the SAP automation run."
         msg.attach(MIMEText(body, "plain"))
         
-        with open(screenshot_path, "rb") as attachment:
+        with open(screenshot_path, "rb") as file:
             part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
+            part.set_payload(file.read())
         encoders.encode_base64(part)
         part.add_header("Content-Disposition", f"attachment; filename={screenshot_path}")
         msg.attach(part)
