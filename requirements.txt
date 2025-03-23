@@ -3,3 +3,5 @@ selenium==4.20.0
 
 # Webdriver manager for managing browser drivers
 webdriver-manager==4.0.1
+
+smtplib
