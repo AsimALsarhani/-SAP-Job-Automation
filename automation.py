@@ -1,3 +1,4 @@
+import socket
 import logging
 import os
 import time
@@ -13,8 +14,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# SAP URL (update this to your SAP SuccessFactors login page)
-SAP_URL = "https://your-sap-successfactors-url.com"
+# SAP URL
+SAP_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg="
 
 # Retrieve required environment variables (exit if any are missing)
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
@@ -25,9 +26,23 @@ if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
     logger.error("One or more required environment variables (SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD) are missing.")
     exit(1)
 
+def is_url_resolvable(url):
+    try:
+        host = url.split("//")[-1].split("/")[0]
+        socket.gethostbyname(host)
+        return True
+    except socket.error:
+        return False
+
 def login_to_sap(driver):
     """Log in to the SAP SuccessFactors portal using explicit waits and logging."""
     try:
+        logger.info("Checking URL resolution.")
+        if not is_url_resolvable(SAP_URL):
+            logger.error(f"URL {SAP_URL} could not be resolved.")
+            driver.quit()
+            return
+        
         logger.info("Navigating to SAP login page.")
         driver.get(SAP_URL)
         time.sleep(5)  # Allow the page to load
@@ -92,31 +107,42 @@ def login_to_sap(driver):
 def main():
     try:
         logger.info("Starting automation script.")
-        
-        # Configure Chrome options for headless mode, incognito, etc.
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--incognito")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--ignore-certificate-errors")  # Ignore SSL certificate errors
-        
-        # Set up the Chrome driver using webdriver-manager
-        chrome_service = ChromeService(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=chrome_service, options=options)
-        
-        # Log in to SAP
-        login_to_sap(driver)
-        
-        # Take a screenshot after successful login
-        screenshot_path = "screenshot.png"
-        driver.save_screenshot(screenshot_path)
-        logger.info(f"Screenshot saved to {screenshot_path}.")
-        
-        # Further actions (e.g., send email with screenshot) can be added here
-        
-        driver.quit()
-        logger.info("Automation script completed successfully.")
+        retries = 3
+        for attempt in range(retries):
+            try:
+                # Configure Chrome options for headless mode, incognito, etc.
+                options = webdriver.ChromeOptions()
+                options.add_argument("--headless")
+                options.add_argument("--incognito")
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--ignore-certificate-errors")  # Ignore SSL certificate errors
+                
+                # Set up the Chrome driver using webdriver-manager
+                chrome_service = ChromeService(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=chrome_service, options=options)
+                
+                # Log in to SAP
+                login_to_sap(driver)
+                
+                # Take a screenshot after successful login
+                screenshot_path = "screenshot.png"
+                driver.save_screenshot(screenshot_path)
+                logger.info(f"Screenshot saved to {screenshot_path}.")
+                
+                # Further actions (e.g., send email with screenshot) can be added here
+                
+                driver.quit()
+                logger.info("Automation script completed successfully.")
+                break
+            except Exception as e:
+                logger.error(f"Attempt {attempt + 1} failed: {e}")
+                if attempt < retries - 1:
+                    logger.info("Retrying...")
+                    time.sleep(5)
+                else:
+                    logger.error("Maximum retries reached. Exiting.")
+                    exit(1)
     except Exception as e:
         logger.error("Automation script failed.")
         exit(1)
