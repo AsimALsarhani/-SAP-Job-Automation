@@ -99,8 +99,7 @@ def main():
         options.add_argument("--incognito")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--dns-prefetch-disable")
-        options.add_argument("--host-resolver-rules=MAP * 8.8.8.8,EXCLUDE my-private-domain.com")
+        options.add_argument("--ignore-certificate-errors")  # Ignore SSL certificate errors
         
         # Set up the Chrome driver using webdriver-manager
         chrome_service = ChromeService(ChromeDriverManager().install())
