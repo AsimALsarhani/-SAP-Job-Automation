@@ -2,42 +2,33 @@ name: SAP Job Automation
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   run-automation:
     runs-on: ubuntu-latest
-    env:
-      # Replace or add additional environment variables if needed.
-      SAP_CONFIG: ${{ secrets.SAP_CONFIG }}
-      # Example: NODE_ENV: production
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
         with:
-          node-version: '16'  # Adjust node version as needed
+          python-version: '3.9'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run Automation Script
-        run: |
-          echo "Starting the automation script..."
-          # Enable strict error checking and debugging output
-          set -euxo pipefail
-          # Run the automation command (ensure this command exists in your package.json or is available in your repo)
-          npm run automation
-        # Optionally, you can add timeout or retry logic here if needed.
-
-      - name: Post-run Cleanup
-        if: always()  # This step will run even if the previous step fails
-        run: |
-          echo "Running post-run cleanup..."
-          # Insert any cleanup or diagnostic commands here, for example:
-          # cat ./logs/automation.log || echo "No log file found."
+        env:
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python automation.py
