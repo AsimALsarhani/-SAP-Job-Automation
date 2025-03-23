@@ -7,26 +7,26 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  run-automation:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
         with:
-          node-version: 16
+          python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
-          # If your package.json is located in a subdirectory, change directory.
-          cd your-folder
-          npm install
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run your command
-        run: |
-          # Navigate to the correct directory if needed.
-          cd your-folder
-          npm run your-script
+      - name: Run Automation Script
+        env:
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python automation.py
