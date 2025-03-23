@@ -1,4 +1,3 @@
-import socket
 import logging
 import os
 import time
@@ -7,54 +6,67 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import WebDriverException, TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# SAP URL
-SAP_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg="
+# SAP URL – update this to the correct URL for your SAP login page
+SAP_URL = "https://sap-login-page-url.com"
 
-# Retrieve required environment variables (exit if any are missing)
+# Retrieve environment variables
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 
 if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
-    logger.error("One or more required environment variables (SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD) are missing.")
+    logger.error("Missing one or more required environment variables: SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD")
     exit(1)
 
-def is_url_resolvable(url):
-    try:
-        host = url.split("//")[-1].split("/")[0]
-        socket.gethostbyname(host)
-        return True
-    except socket.error:
-        return False
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_DELAY = 5  # seconds
+
+def navigate_to_sap_login(driver):
+    """Navigate to the SAP login page with retry on DNS resolution errors."""
+    retries = 0
+    while retries < MAX_RETRIES:
+        try:
+            logger.info("Navigating to SAP login page: %s", SAP_URL)
+            driver.get(SAP_URL)
+            
+            # If navigation succeeds, wait a bit for the page to load.
+            time.sleep(5)
+            
+            # Check that the page title is non-empty as a basic indicator the page loaded.
+            if driver.title:
+                logger.info("Page loaded with title: %s", driver.title)
+            else:
+                logger.warning("Page loaded but title is empty.")
+            return  # Exit the function if no exception
+        except WebDriverException as e:
+            if 'ERR_NAME_NOT_RESOLVED' in str(e):
+                retries += 1
+                logger.error("DNS resolution error encountered (attempt %d/%d). Retrying in %d seconds...", retries, MAX_RETRIES, RETRY_DELAY)
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error("WebDriverException encountered: %s", e)
+                raise e
+    raise Exception("Failed to resolve DNS after multiple retries.")
 
 def login_to_sap(driver):
     """Log in to the SAP SuccessFactors portal using explicit waits and logging."""
     try:
-        logger.info("Checking URL resolution.")
-        if not is_url_resolvable(SAP_URL):
-            logger.error(f"URL {SAP_URL} could not be resolved.")
-            driver.quit()
-            return
-        
-        logger.info("Navigating to SAP login page.")
-        driver.get(SAP_URL)
-        time.sleep(5)  # Allow the page to load
+        navigate_to_sap_login(driver)
 
-        logger.info("Page title: " + driver.title)
-        
-        # Update these XPaths by inspecting the SAP login page.
-        username_xpath = "//input[@id='username']"           # Replace with actual XPath for username field
-        password_xpath = "//input[@id='password']"           # Replace with actual XPath for password field
-        login_button_xpath = "//button[@id='loginBtn']"      # Replace with actual XPath for login button
-        success_xpath = "//div[@id='dashboard']"             # Replace with an element that confirms a successful login
-        
+        # Update these XPaths based on your SAP login page. Use your browser's developer tools to verify.
+        username_xpath = "//input[@id='username']"         # Replace with actual XPath
+        password_xpath = "//input[@id='password']"         # Replace with actual XPath
+        login_button_xpath = "//button[@id='loginBtn']"    # Replace with actual XPath
+        success_xpath = "//div[@id='dashboard']"           # Replace with an element that confirms a successful login
+
         # Wait for the username field and enter username
         username_field = WebDriverWait(driver, 90).until(
             EC.visibility_of_element_located((By.XPATH, username_xpath))
@@ -62,7 +74,7 @@ def login_to_sap(driver):
         logger.info("Username field located.")
         username_field.send_keys(SAP_USERNAME)
         logger.info("Entered SAP username.")
-        
+
         # Wait for the password field and enter password
         password_field = WebDriverWait(driver, 90).until(
             EC.visibility_of_element_located((By.XPATH, password_xpath))
@@ -70,7 +82,7 @@ def login_to_sap(driver):
         logger.info("Password field located.")
         password_field.send_keys(SAP_PASSWORD)
         logger.info("Entered SAP password.")
-        
+
         # Wait for the login button to be clickable and click it
         login_button = WebDriverWait(driver, 90).until(
             EC.element_to_be_clickable((By.XPATH, login_button_xpath))
@@ -78,27 +90,22 @@ def login_to_sap(driver):
         logger.info("Login button is clickable.")
         login_button.click()
         logger.info("Clicked on the login button.")
-        
+
         # Wait for an element that indicates a successful login
         WebDriverWait(driver, 90).until(
             EC.presence_of_element_located((By.XPATH, success_xpath))
         )
         logger.info("Logged in successfully.")
-        
-    except TimeoutException as te:
-        logger.error("Timeout while waiting for an element during login.")
-        logger.error("Page source snippet: " + driver.page_source[:1000])
+
+    except (TimeoutException, NoSuchElementException) as e:
+        logger.error("Element error during login: %s", e)
+        logger.error("Page source snippet: %s", driver.page_source[:1000])
         driver.quit()
-        raise te
-    except NoSuchElementException as ne:
-        logger.error(f"Element not found: {ne}")
-        logger.error("Page source snippet: " + driver.page_source[:1000])
-        driver.quit()
-        raise ne
+        raise e
     except Exception as e:
-        logger.error(f"Error during SAP login process: {e}")
+        logger.error("Error during SAP login process: %s", e)
         try:
-            logger.error("Page source snippet: " + driver.page_source[:1000])
+            logger.error("Page source snippet: %s", driver.page_source[:1000])
         except Exception:
             logger.error("Could not retrieve page source.")
         driver.quit()
@@ -107,42 +114,29 @@ def login_to_sap(driver):
 def main():
     try:
         logger.info("Starting automation script.")
-        retries = 3
-        for attempt in range(retries):
-            try:
-                # Configure Chrome options for headless mode, incognito, etc.
-                options = webdriver.ChromeOptions()
-                options.add_argument("--headless")
-                options.add_argument("--incognito")
-                options.add_argument("--no-sandbox")
-                options.add_argument("--disable-dev-shm-usage")
-                options.add_argument("--ignore-certificate-errors")  # Ignore SSL certificate errors
-                
-                # Set up the Chrome driver using webdriver-manager
-                chrome_service = ChromeService(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=chrome_service, options=options)
-                
-                # Log in to SAP
-                login_to_sap(driver)
-                
-                # Take a screenshot after successful login
-                screenshot_path = "screenshot.png"
-                driver.save_screenshot(screenshot_path)
-                logger.info(f"Screenshot saved to {screenshot_path}.")
-                
-                # Further actions (e.g., send email with screenshot) can be added here
-                
-                driver.quit()
-                logger.info("Automation script completed successfully.")
-                break
-            except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < retries - 1:
-                    logger.info("Retrying...")
-                    time.sleep(5)
-                else:
-                    logger.error("Maximum retries reached. Exiting.")
-                    exit(1)
+        
+        # Configure Chrome options
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--incognito")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+
+        # Set up Chrome driver with webdriver-manager
+        chrome_service = ChromeService(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=chrome_service, options=options)
+        
+        login_to_sap(driver)
+        
+        # Example: take a screenshot after login
+        screenshot_path = "screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        logger.info("Screenshot saved to %s", screenshot_path)
+        
+        # Add further automation steps as needed...
+        
+        driver.quit()
+        logger.info("Automation script completed successfully.")
     except Exception as e:
         logger.error("Automation script failed.")
         exit(1)
