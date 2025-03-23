@@ -25,7 +25,7 @@ SAP_PASSWORD = os.getenv("SAP_PASSWORD")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # For mshtag1990@gmail.com
 
 if not SAP_USERNAME or not SAP_PASSWORD or not EMAIL_PASSWORD:
-    logger.error("Missing one or more required environment variables: SAP_USERNAME, SAP_PASSWORD, EMAIL_PASSWORD")
+    logger.error("Missing one or more required environment variables: SAP_USERNAME, SAP_PASSWORD, or EMAIL_PASSWORD")
     raise ValueError("Missing credentials")
 
 # SAP SuccessFactors login URL (provided)
@@ -37,13 +37,14 @@ SAP_URL = (
 def setup_driver():
     """
     Set up the Chrome WebDriver using webdriver_manager.
-    Uses the --incognito flag to force a fresh session and avoids specifying a fixed user-data-dir.
+    Use the --incognito flag to force a fresh session and avoid user-data conflicts.
     """
     chrome_options = Options()
-    chrome_options.headless = True  # Set to False for debugging (visible browser)
+    chrome_options.headless = True  # Change to False for debugging (visible browser)
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--incognito")  # Use incognito mode for a fresh session
+    # Do NOT specify a fixed user-data-dir so that Chrome uses its default temporary profile.
     
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -55,13 +56,13 @@ def login_to_sap(driver):
         logger.info("Navigating to SAP login page.")
         driver.get(SAP_URL)
         time.sleep(5)  # Allow the page to load
-
+        
         logger.info("Page title: " + driver.title)
         
         # XPath for the username field (update if necessary)
         username_xpath = (
-            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
-            "div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
+            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/"
+            "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[1]/td[2]/input"
         )
         username_field = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.XPATH, username_xpath))
@@ -72,8 +73,8 @@ def login_to_sap(driver):
         
         # XPath for the password field (update if necessary)
         password_xpath = (
-            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[2]/div/"
-            "div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
+            "/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/"
+            "div[3]/div[2]/div[2]/div/div/div[2]/div/div/table/tbody/tr[2]/td[2]/div/input[1]"
         )
         password_field = WebDriverWait(driver, 60).until(
             EC.visibility_of_element_located((By.XPATH, password_xpath))
@@ -91,8 +92,8 @@ def login_to_sap(driver):
         login_button.click()
         logger.info("Clicked on the login button.")
         
-        # Wait for an element that confirms successful login (update this XPath to a reliable element on your SAP page)
-        success_xpath = "//div[@id='dashboard']"
+        # Wait for an element that confirms successful login (update this XPath as needed)
+        success_xpath = "//div[@id='dashboard']"  # Example; adjust to an element that appears after login
         WebDriverWait(driver, 60).until(
             EC.presence_of_element_located((By.XPATH, success_xpath))
         )
@@ -119,11 +120,11 @@ def login_to_sap(driver):
 
 def perform_actions(driver):
     """
-    After login, perform the following steps:
+    Perform the following actions:
       1. Wait 50 seconds.
-      2. Scroll down to the bottom of the page and click the "Save" button.
+      2. Scroll down to the bottom and click the "Save" button.
       3. Wait 55 seconds.
-      4. Scroll up to the top and click on a blank white area.
+      4. Scroll up to the top and click on a blank area.
       5. Wait 10 seconds.
     """
     try:
@@ -131,27 +132,27 @@ def perform_actions(driver):
         time.sleep(50)
         
         # Scroll down to the bottom of the page
-        logger.info("Scrolling down to the bottom of the page.")
+        logger.info("Scrolling to the bottom of the page.")
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
         
-        # Click the "Save" button (update selector as needed)
+        # Click the "Save" button (update the selector as needed)
         save_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(),'Save')]"))
         )
-        logger.info("Save button located.")
+        logger.info("Save button located and clickable.")
         save_button.click()
         logger.info("Clicked on the Save button.")
         
         logger.info("Waiting 55 seconds after clicking Save.")
         time.sleep(55)
         
-        # Scroll back up to the top of the page
-        logger.info("Scrolling up to the top of the page.")
+        # Scroll back up to the top
+        logger.info("Scrolling back to the top of the page.")
         driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
         
-        # Click on a blank area - using the body element as a fallback
+        # Click on a blank white area (using the body as a fallback)
         blank_area = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.TAG_NAME, "body"))
         )
@@ -179,8 +180,7 @@ def take_screenshot(driver, file_path="screenshot.png"):
 def send_email(screenshot_path, sender_email="mshtag1990@gmail.com", receiver_email="asimalsarhani@gmail.com"):
     """
     Send an email with the screenshot attached.
-    This example uses Gmail's SMTP_SSL.
-    Ensure that 'EMAIL_PASSWORD' corresponds to the sender's (mshtag1990@gmail.com) app password.
+    Uses Gmail's SMTP_SSL. Ensure EMAIL_PASSWORD is an app password for mshtag1990@gmail.com.
     """
     try:
         msg = MIMEMultipart()
