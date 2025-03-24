@@ -53,17 +53,16 @@ def main():
 
     try:
         # Step 1: Navigate to the SAP portal sign-in page
-        SAP_SIGNIN_URL = ("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
-                           "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg")
+        SAP_SIGNIN_URL = (
+            "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
+            "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg"
+        )
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
-        
-        # Allow the page to load
         time.sleep(5)
 
         # Step 2: Perform sign in (update the selectors as needed)
         try:
-            # Example selectors – update these to match the actual page
             username_field = driver.find_element(By.NAME, "username")
             password_field = driver.find_element(By.NAME, "password")
             username_field.send_keys(SAP_USERNAME)
@@ -76,8 +75,7 @@ def main():
         except Exception as e:
             print("Sign in step encountered an error or might not be required:", e)
 
-        # Wait for sign in to complete and for the next page to load
-        time.sleep(10)
+        time.sleep(10)  # Wait for sign in to complete
 
         # Step 3: Scroll to the bottom and click the "Save" button
         try:
@@ -89,7 +87,7 @@ def main():
         except Exception as e:
             print("Save button not found or error occurred:", e)
 
-        # Step 4: Wait for 50 seconds
+        # Step 4: Wait for 50 seconds after clicking "Save"
         time.sleep(50)
 
         # Step 5: Scroll back up and click on a blank area
@@ -98,21 +96,41 @@ def main():
         body = driver.find_element(By.TAG_NAME, "body")
         body.click()
         print("Clicked on a blank area.")
-
-        # Wait 10 seconds before taking the screenshot
         time.sleep(10)
 
-        # Step 6: Take a screenshot and save it
+        # Step 6: Scroll to target elements to ensure they are visible in the screenshot
+        try:
+            # Scroll to element with id "lastSaveTimeMsg"
+            last_save_msg = driver.find_element(By.XPATH, "//*[@id='lastSaveTimeMsg']")
+            driver.execute_script("arguments[0].scrollIntoView();", last_save_msg)
+            print("Scrolled to element 'lastSaveTimeMsg'.")
+            time.sleep(2)
+        except Exception as e:
+            print("Could not find element with id 'lastSaveTimeMsg':", e)
+
+        try:
+            # Scroll to element with id "2556:_sysMsgUl"
+            sys_msg_ul = driver.find_element(By.XPATH, "//*[@id='2556:_sysMsgUl']")
+            driver.execute_script("arguments[0].scrollIntoView();", sys_msg_ul)
+            print("Scrolled to element '2556:_sysMsgUl'.")
+            time.sleep(2)
+        except Exception as e:
+            print("Could not find element with id '2556:_sysMsgUl':", e)
+
+        # Optionally, scroll to the top again if you want a full-page view including both elements:
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(2)
+
+        # Step 7: Take a screenshot and save it
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
         print(f"Screenshot saved at {screenshot_path}")
 
-        # Step 7: Send the screenshot via email
+        # Step 8: Send the screenshot via email
         send_email(screenshot_path)
 
     except Exception as e:
         print(f"An error occurred: {e}")
-
     finally:
         driver.quit()
         print("Browser closed.")
