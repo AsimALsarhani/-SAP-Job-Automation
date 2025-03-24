@@ -22,6 +22,7 @@ SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 def send_email(screenshot_path):
+    """Send an email with the screenshot attachment."""
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = RECIPIENT_EMAIL
@@ -50,6 +51,7 @@ def highlight_element(driver, element):
     driver.execute_script("arguments[0].style.border='3px solid red'", element)
 
 def main():
+    """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
     chrome_options = Options()
     chrome_options.add_argument("--headless")  # Run without GUI
@@ -62,6 +64,8 @@ def main():
         SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
+
+        # Wait for the login fields
         WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, "username")))
 
         # Step 2: Perform sign in
@@ -73,6 +77,8 @@ def main():
         sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
         sign_in_button.click()
         print("Sign in button clicked.")
+
+        # Wait for the page to load after login
         WebDriverWait(driver, 15).until(EC.url_changes(SAP_SIGNIN_URL))
 
         # Step 3: Click the Save button and wait for changes
