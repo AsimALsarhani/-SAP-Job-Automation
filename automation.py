@@ -15,8 +15,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Retrieve credentials from environment variables
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "your-email@gmail.com")
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "your-app-password")
 RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -84,7 +84,7 @@ def main():
         # Step 3: Click the Save button and wait for changes
         try:
             save_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]"))
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]")
             )
             save_button.click()
             print("Save button clicked.")
