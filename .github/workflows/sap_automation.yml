@@ -12,16 +12,32 @@ jobs:
     steps:
       - name: Set up Google DNS
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
-          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+          sudo resolvectl dns eth0 8.8.8.8 8.8.4.4
 
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Cache Python packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
+          python -m venv venv
+          source venv/bin/activate
           pip install selenium webdriver-manager
 
       - name: Run SAP Automation Script
         run: |
+          set -x  # Enable debug logs
+          source venv/bin/activate
           python automation.py
