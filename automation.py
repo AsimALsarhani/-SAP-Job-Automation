@@ -1,6 +1,6 @@
 import time
-import smtplib
 import os
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -10,10 +10,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Email credentials and recipient details
-SENDER_EMAIL = "mshtag1990@gmail.com"        # Sender's email address
-SENDER_PASSWORD = "cnfz gnxd icab odza"        # Replace with your email password or app-specific password
-RECIPIENT_EMAIL = "asimalsarhani@gmail.com"    # Recipient's email address
+# Retrieve credentials from environment variables (or use defaults for testing)
+SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
+SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
+RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
@@ -41,69 +43,79 @@ def send_email(screenshot_path):
     except Exception as e:
         print(f"Error sending email: {e}")
 
-# Set up Chrome options and initialize WebDriver
-chrome_options = Options()
-chrome_options.add_argument("--headless")              # Run in headless mode (no GUI)
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
+def main():
+    # Set up Chrome options and initialize the WebDriver
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-try:
-    # Step 1: Navigate to the SAP portal
-    SAP_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=#skipContent"
-    driver.get(SAP_URL)
-    print("Page loaded successfully.")
-
-    # Optional: Sign in if required
-    # Uncomment and update the following lines with the correct locators and credentials if your page requires signing in.
-    #
-    # time.sleep(5)  # Wait for the login page to load
-    # username_field = driver.find_element(By.ID, "username")  # Adjust locator as needed
-    # password_field = driver.find_element(By.ID, "password")  # Adjust locator as needed
-    # username_field.send_keys("your-username")
-    # password_field.send_keys("your-password")
-    # sign_in_button = driver.find_element(By.ID, "login-button")  # Adjust locator as needed
-    # sign_in_button.click()
-    # time.sleep(5)  # Wait for navigation after sign in
-
-    # Wait for 50 seconds after page load (as required)
-    time.sleep(50)
-
-    # Step 2: Scroll to the bottom of the page and click the "Save" button
     try:
-        # Scroll to the bottom of the page
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(2)  # Allow any lazy-loaded elements to appear
-        save_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Save')]")
-        save_button.click()
-        print("Save button clicked.")
+        # Step 1: Navigate to the SAP portal sign-in page
+        SAP_SIGNIN_URL = ("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
+                           "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg")
+        driver.get(SAP_SIGNIN_URL)
+        print("SAP sign-in page loaded successfully.")
+        
+        # Allow the page to load
+        time.sleep(5)
+
+        # Step 2: Perform sign in (update the selectors as needed)
+        try:
+            # Example selectors – update these to match the actual page
+            username_field = driver.find_element(By.NAME, "username")
+            password_field = driver.find_element(By.NAME, "password")
+            username_field.send_keys(SAP_USERNAME)
+            password_field.send_keys(SAP_PASSWORD)
+            
+            # Click on the Sign In button (update the XPath or selector accordingly)
+            sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
+            sign_in_button.click()
+            print("Sign in button clicked.")
+        except Exception as e:
+            print("Sign in step encountered an error or might not be required:", e)
+
+        # Wait for sign in to complete and for the next page to load
+        time.sleep(10)
+
+        # Step 3: Scroll to the bottom and click the "Save" button
+        try:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)  # Allow any lazy-loaded elements to appear
+            save_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Save')]")
+            save_button.click()
+            print("Save button clicked.")
+        except Exception as e:
+            print("Save button not found or error occurred:", e)
+
+        # Step 4: Wait for 50 seconds
+        time.sleep(50)
+
+        # Step 5: Scroll back up and click on a blank area
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(1)
+        body = driver.find_element(By.TAG_NAME, "body")
+        body.click()
+        print("Clicked on a blank area.")
+
+        # Wait 10 seconds before taking the screenshot
+        time.sleep(10)
+
+        # Step 6: Take a screenshot and save it
+        screenshot_path = "screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        print(f"Screenshot saved at {screenshot_path}")
+
+        # Step 7: Send the screenshot via email
+        send_email(screenshot_path)
+
     except Exception as e:
-        print(f"Save button not found or error occurred: {e}")
+        print(f"An error occurred: {e}")
 
-    # Wait for 55 seconds after clicking "Save"
-    time.sleep(55)
+    finally:
+        driver.quit()
+        print("Browser closed.")
 
-    # Step 3: Scroll to the top of the page and click on a blank area
-    driver.execute_script("window.scrollTo(0, 0);")
-    body = driver.find_element(By.TAG_NAME, "body")
-    body.click()  # Simulate clicking on a blank area
-    print("Clicked on a blank area.")
-
-    # Wait 10 seconds before taking the screenshot
-    time.sleep(10)
-
-    # Step 4: Take a screenshot
-    screenshot_path = "screenshot.png"  # Path to save the screenshot
-    driver.save_screenshot(screenshot_path)
-    print(f"Screenshot saved at {screenshot_path}")
-
-    # Step 5: Send the screenshot via email
-    send_email(screenshot_path)
-
-except Exception as e:
-    print(f"An error occurred: {e}")
-
-finally:
-    driver.quit()
-    print("Browser closed.")
+if __name__ == "__main__":
+    main()
