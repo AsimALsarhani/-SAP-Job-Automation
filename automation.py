@@ -8,9 +8,11 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Retrieve credentials from environment variables (or use defaults for testing)
+# Retrieve credentials from environment variables
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
@@ -43,90 +45,81 @@ def send_email(screenshot_path):
     except Exception as e:
         print(f"Error sending email: {e}")
 
+def highlight_element(driver, element):
+    """Highlights a Selenium WebElement by changing its border color via JavaScript."""
+    driver.execute_script("arguments[0].style.border='3px solid red'", element)
+
 def main():
-    # Set up Chrome options and initialize the WebDriver
+    # Set up Chrome options and initialize WebDriver
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")  # Run without GUI
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
         # Step 1: Navigate to the SAP portal sign-in page
-        SAP_SIGNIN_URL = (
-            "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&"
-            "company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg"
-        )
+        SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
-        time.sleep(5)
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, "username")))
 
-        # Step 2: Perform sign in (update the selectors as needed)
+        # Step 2: Perform sign in
+        username_field = driver.find_element(By.NAME, "username")
+        password_field = driver.find_element(By.NAME, "password")
+        username_field.send_keys(SAP_USERNAME)
+        password_field.send_keys(SAP_PASSWORD)
+
+        sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
+        sign_in_button.click()
+        print("Sign in button clicked.")
+        WebDriverWait(driver, 15).until(EC.url_changes(SAP_SIGNIN_URL))
+
+        # Step 3: Click the Save button and wait for changes
         try:
-            username_field = driver.find_element(By.NAME, "username")
-            password_field = driver.find_element(By.NAME, "password")
-            username_field.send_keys(SAP_USERNAME)
-            password_field.send_keys(SAP_PASSWORD)
-            
-            # Click on the Sign In button (update the XPath or selector accordingly)
-            sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
-            sign_in_button.click()
-            print("Sign in button clicked.")
-        except Exception as e:
-            print("Sign in step encountered an error or might not be required:", e)
-
-        time.sleep(10)  # Wait for sign in to complete
-
-        # Step 3: Scroll to the bottom and click the "Save" button
-        try:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)  # Allow any lazy-loaded elements to appear
-            save_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Save')]")
+            save_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]"))
+            )
             save_button.click()
             print("Save button clicked.")
         except Exception as e:
-            print("Save button not found or error occurred:", e)
+            print("Save button not found or not clickable:", e)
 
-        # Step 4: Wait for 50 seconds after clicking "Save"
-        time.sleep(50)
+        time.sleep(50)  # Wait for save operation to complete
 
-        # Step 5: Scroll back up and click on a blank area
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(1)
-        body = driver.find_element(By.TAG_NAME, "body")
-        body.click()
-        print("Clicked on a blank area.")
-        time.sleep(10)
-
-        # Step 6: Scroll to target elements to ensure they are visible in the screenshot
+        # Step 4: Ensure the target elements are visible
         try:
-            # Scroll to element with id "lastSaveTimeMsg"
-            last_save_msg = driver.find_element(By.XPATH, "//*[@id='lastSaveTimeMsg']")
-            driver.execute_script("arguments[0].scrollIntoView();", last_save_msg)
-            print("Scrolled to element 'lastSaveTimeMsg'.")
-            time.sleep(2)
+            # Locate and scroll to the "lastSaveTimeMsg" element
+            last_save_msg = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
+            )
+            driver.execute_script("arguments[0].scrollIntoView(true);", last_save_msg)
+            highlight_element(driver, last_save_msg)
+            print("Scrolled to and highlighted 'lastSaveTimeMsg'.")
+            time.sleep(2)  # Allow UI to update
+
         except Exception as e:
             print("Could not find element with id 'lastSaveTimeMsg':", e)
 
         try:
-            # Scroll to element with id "2556:_sysMsgUl"
-            sys_msg_ul = driver.find_element(By.XPATH, "//*[@id='2556:_sysMsgUl']")
-            driver.execute_script("arguments[0].scrollIntoView();", sys_msg_ul)
-            print("Scrolled to element '2556:_sysMsgUl'.")
+            # Locate and scroll to the "2556:_sysMsgUl" element
+            sys_msg_ul = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
+            )
+            driver.execute_script("arguments[0].scrollIntoView(true);", sys_msg_ul)
+            highlight_element(driver, sys_msg_ul)
+            print("Scrolled to and highlighted '2556:_sysMsgUl'.")
             time.sleep(2)
+
         except Exception as e:
             print("Could not find element with id '2556:_sysMsgUl':", e)
 
-        # Optionally, scroll to the top again if you want a full-page view including both elements:
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(2)
-
-        # Step 7: Take a screenshot and save it
+        # Step 5: Capture the screenshot
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
         print(f"Screenshot saved at {screenshot_path}")
 
-        # Step 8: Send the screenshot via email
+        # Step 6: Send the screenshot via email
         send_email(screenshot_path)
 
     except Exception as e:
