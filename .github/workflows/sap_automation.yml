@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 8 * * *"  # Runs daily at 8 AM UTC
 
 jobs:
   run-sap-automation:
@@ -15,7 +17,7 @@ jobs:
           sudo resolvectl dns eth0 8.8.8.8 8.8.4.4
 
       - name: Checkout repository
-        uses: actions/checkout@v3  # Updated version to v3
+        uses: actions/checkout@v3
 
       - name: Install Chrome
         run: |
@@ -23,7 +25,7 @@ jobs:
           sudo apt-get install -y google-chrome-stable
 
       - name: Cache Python packages
-        uses: actions/cache@v3  # Updated version to v3
+        uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -37,7 +39,11 @@ jobs:
           pip install selenium webdriver-manager
 
       - name: Run SAP Automation Script
+        env:
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
         run: |
           set -x  # Enable debug logs
           source venv/bin/activate
-          python automation.py
+          python automation.py || echo "Script failed. Check logs for details."
