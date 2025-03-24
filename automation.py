@@ -1,141 +1,77 @@
-import os
 import time
 import smtplib
-import logging
-from email.message import EmailMessage
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-from webdriver_manager.chrome import ChromeDriverManager
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# Initialize the WebDriver
+driver = webdriver.Chrome()
 
-# Email credentials (Use environment variables for security)
-EMAIL_SENDER = "mshtag1990@gmail.com"
-EMAIL_RECEIVER = "asimalsarhani@gmail.com"
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # Store this securely
+# Step 1: Log in to SAP SuccessFactors
+driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=#skipContent")
+time.sleep(5)  # Adjust depending on load time
 
-# SAP credentials (Use environment variables for security)
-SAP_USERNAME = os.getenv("SAP_USERNAME")
-SAP_PASSWORD = os.getenv("SAP_PASSWORD")
-SAP_LOGIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+# Fill in login credentials (replace with actual credentials)
+username = driver.find_element(By.ID, "username")
+password = driver.find_element(By.ID, "password")
+username.send_keys("your_username")
+password.send_keys("your_password")
+password.send_keys(Keys.RETURN)
 
-# Setup WebDriver
-options = webdriver.ChromeOptions()
-options.add_argument("--headless")  # Run without opening a browser
-options.add_argument("--disable-gpu")
-options.add_argument("--no-sandbox")
+time.sleep(50)  # Wait for 50 seconds
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+# Step 2: Scroll to the bottom and click "Save" button
+save_button = driver.find_element(By.XPATH, "//button[contains(text(),'Save')]")
+driver.execute_script("arguments[0].scrollIntoView();", save_button)
+save_button.click()
 
-def login():
-    """Logs into the SAP SuccessFactors portal."""
-    try:
-        logging.info("Navigating to SAP login page...")
-        driver.get(SAP_LOGIN_URL)
-        time.sleep(3)
+time.sleep(55)  # Wait for 55 seconds
 
-        # Locate username and password fields
-        username_field = driver.find_element(By.ID, "username")  # Update ID if needed
-        password_field = driver.find_element(By.ID, "password")
-        login_button = driver.find_element(By.ID, "login")
+# Step 3: Scroll to the top and click a blank area
+driver.execute_script("window.scrollTo(0, 0);")
+blank_area = driver.find_element(By.XPATH, "//body")
+ActionChains(driver).move_to_element(blank_area).click().perform()
 
-        # Enter credentials
-        username_field.send_keys(SAP_USERNAME)
-        password_field.send_keys(SAP_PASSWORD)
-        login_button.click()
-        
-        logging.info("Successfully logged in.")
-        time.sleep(50)  # Wait for 50 seconds
+time.sleep(10)  # Wait for 10 seconds
 
-    except Exception as e:
-        logging.error(f"Login failed: {e}")
-        driver.quit()
-        exit(1)
+# Step 4: Take a screenshot
+screenshot_path = "screenshot.png"
+driver.save_screenshot(screenshot_path)
 
-def scroll_and_save():
-    """Scrolls to the bottom and clicks 'Save'."""
-    try:
-        logging.info("Scrolling to the bottom and clicking 'Save'...")
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(3)
+# Close the browser
+driver.quit()
 
-        save_button = driver.find_element(By.ID, "saveButton")  # Update ID if needed
-        save_button.click()
+# Step 5: Email the screenshot
+def send_email(subject, body, to_email, screenshot_path):
+    from_email = "mshtag1990@gmail.com"
+    password = "your_email_password"  # Use environment variables or secure methods for password handling
 
-        logging.info("Clicked 'Save'. Waiting 55 seconds...")
-        time.sleep(55)
+    msg = MIMEMultipart()
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
 
-    except Exception as e:
-        logging.error(f"Failed to click 'Save': {e}")
-        driver.quit()
-        exit(1)
+    msg.attach(body)
 
-def scroll_and_click_blank():
-    """Scrolls to the top and clicks a blank area."""
-    try:
-        logging.info("Scrolling to the top...")
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(3)
+    # Attach the screenshot
+    part = MIMEBase('application', 'octet-stream')
+    with open(screenshot_path, 'rb') as file:
+        part.set_payload(file.read())
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f'attachment; filename={screenshot_path}')
+    msg.attach(part)
 
-        blank_area = driver.find_element(By.TAG_NAME, "body")  # Adjust selector if needed
-        ActionChains(driver).move_to_element(blank_area).click().perform()
-        
-        logging.info("Clicked on a blank area. Waiting 10 seconds...")
-        time.sleep(10)
+    # Send the email
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(from_email, password)
+    text = msg.as_string()
+    server.sendmail(from_email, to_email, text)
+    server.quit()
 
-    except Exception as e:
-        logging.error(f"Failed to click blank area: {e}")
-        driver.quit()
-        exit(1)
-
-def take_screenshot():
-    """Takes a screenshot and saves it."""
-    screenshot_path = "screenshot.png"
-    try:
-        logging.info("Taking a screenshot...")
-        driver.save_screenshot(screenshot_path)
-        logging.info(f"Screenshot saved at {screenshot_path}")
-        return screenshot_path
-
-    except Exception as e:
-        logging.error(f"Failed to take screenshot: {e}")
-        driver.quit()
-        exit(1)
-
-def send_email(screenshot_path):
-    """Sends an email with the screenshot."""
-    try:
-        logging.info("Preparing email...")
-        msg = EmailMessage()
-        msg["Subject"] = "SAP Automation Screenshot"
-        msg["From"] = EMAIL_SENDER
-        msg["To"] = EMAIL_RECEIVER
-        msg.set_content("Attached is the screenshot from SAP automation.")
-
-        with open(screenshot_path, "rb") as file:
-            msg.add_attachment(file.read(), maintype="image", subtype="png", filename="screenshot.png")
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            server.send_message(msg)
-        
-        logging.info("Email sent successfully.")
-
-    except Exception as e:
-        logging.error(f"Failed to send email: {e}")
-        exit(1)
-
-# Run the automation
-try:
-    login()
-    scroll_and_save()
-    scroll_and_click_blank()
-    screenshot = take_screenshot()
-    send_email(screenshot)
-finally:
-    driver.quit()
-    logging.info("Automation complete.")
+# Send the email with the screenshot
+send_email("SAP SuccessFactors Screenshot", "Attached is the screenshot from the SAP SuccessFactors portal.", "asimalsarhani@gmail.com", screenshot_path)
