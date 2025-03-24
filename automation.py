@@ -15,8 +15,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Retrieve credentials from environment variables
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "your-email@gmail.com")
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "your-app-password")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -84,43 +84,48 @@ def main():
         # Step 3: Click the Save button and wait for changes
         try:
             save_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]")
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]"))
             )
             save_button.click()
             print("Save button clicked.")
         except Exception as e:
             print("Save button not found or not clickable:", e)
 
-        time.sleep(50)  # Wait for save operation to complete
+        time.sleep(50)  # Wait for the save operation to complete
 
-        # Step 4: Ensure the target elements are visible
+        # Step 4: Scroll up and ensure the target elements are visible
+        # Scroll to top first
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(2)
+
+        # Locate and scroll to the "lastSaveTimeMsg" element
         try:
-            # Locate and scroll to the "lastSaveTimeMsg" element
-            last_save_msg = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
+            last_save_msg = WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
             )
             driver.execute_script("arguments[0].scrollIntoView(true);", last_save_msg)
             highlight_element(driver, last_save_msg)
             print("Scrolled to and highlighted 'lastSaveTimeMsg'.")
-            time.sleep(2)  # Allow UI to update
-
+            time.sleep(2)
         except Exception as e:
             print("Could not find element with id 'lastSaveTimeMsg':", e)
 
+        # Locate and scroll to the "2556:_sysMsgUl" element
         try:
-            # Locate and scroll to the "2556:_sysMsgUl" element
-            sys_msg_ul = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
+            sys_msg_ul = WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
             )
             driver.execute_script("arguments[0].scrollIntoView(true);", sys_msg_ul)
             highlight_element(driver, sys_msg_ul)
             print("Scrolled to and highlighted '2556:_sysMsgUl'.")
             time.sleep(2)
-
         except Exception as e:
             print("Could not find element with id '2556:_sysMsgUl':", e)
 
-        # Step 5: Capture the screenshot
+        # Optional: Set a larger window size to capture more of the page
+        driver.set_window_size(1920, 4000)
+
+        # Step 5: Capture the screenshot after all elements are in view
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
         print(f"Screenshot saved at {screenshot_path}")
