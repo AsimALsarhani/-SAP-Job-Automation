@@ -93,12 +93,11 @@ def main():
 
         time.sleep(50)  # Wait for the save operation to complete
 
-        # Step 4: Scroll up and ensure the target elements are visible
-        # Scroll to top first
+        # Step 4: Scroll to the top first
         driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
 
-        # Locate and scroll to the "lastSaveTimeMsg" element
+        # Now wait for and scroll to the target elements
         try:
             last_save_msg = WebDriverWait(driver, 20).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
@@ -110,7 +109,6 @@ def main():
         except Exception as e:
             print("Could not find element with id 'lastSaveTimeMsg':", e)
 
-        # Locate and scroll to the "2556:_sysMsgUl" element
         try:
             sys_msg_ul = WebDriverWait(driver, 20).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
@@ -124,6 +122,7 @@ def main():
 
         # Optional: Set a larger window size to capture more of the page
         driver.set_window_size(1920, 4000)
+        time.sleep(2)
 
         # Step 5: Capture the screenshot after all elements are in view
         screenshot_path = "screenshot.png"
