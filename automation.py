@@ -1,5 +1,6 @@
 import time
 import smtplib
+import os
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
@@ -8,6 +9,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 
+# Retrieve credentials from environment variables
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+SAP_USERNAME = os.getenv("SAP_USERNAME")
+SAP_PASSWORD = os.getenv("SAP_PASSWORD")
+FROM_EMAIL = "mshtag1990@gmail.com"  # Your email
+
 # Initialize the WebDriver
 driver = webdriver.Chrome()
 
@@ -15,11 +22,11 @@ driver = webdriver.Chrome()
 driver.get("https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05&site=&loginFlowRequired=true&_s.crb=7rUayllvSa7Got9Vb3iPnhO3PDDqujW7AwjljaAL6sg=#skipContent")
 time.sleep(5)  # Adjust depending on load time
 
-# Fill in login credentials (replace with actual credentials)
+# Fill in login credentials (using secrets)
 username = driver.find_element(By.ID, "username")
 password = driver.find_element(By.ID, "password")
-username.send_keys("your_username")
-password.send_keys("your_password")
+username.send_keys(SAP_USERNAME)
+password.send_keys(SAP_PASSWORD)
 password.send_keys(Keys.RETURN)
 
 time.sleep(50)  # Wait for 50 seconds
@@ -47,11 +54,8 @@ driver.quit()
 
 # Step 5: Email the screenshot
 def send_email(subject, body, to_email, screenshot_path):
-    from_email = "mshtag1990@gmail.com"
-    password = "your_email_password"  # Use environment variables or secure methods for password handling
-
     msg = MIMEMultipart()
-    msg['From'] = from_email
+    msg['From'] = FROM_EMAIL
     msg['To'] = to_email
     msg['Subject'] = subject
 
@@ -68,9 +72,9 @@ def send_email(subject, body, to_email, screenshot_path):
     # Send the email
     server = smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
-    server.login(from_email, password)
+    server.login(FROM_EMAIL, EMAIL_PASSWORD)
     text = msg.as_string()
-    server.sendmail(from_email, to_email, text)
+    server.sendmail(FROM_EMAIL, to_email, text)
     server.quit()
 
 # Send the email with the screenshot
