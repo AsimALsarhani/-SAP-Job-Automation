@@ -12,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # Email credentials and recipient details
 SENDER_EMAIL = "mshtag1990@gmail.com"  # Sender's email
-SENDER_PASSWORD = "<your_password_here>"  # Replace with your email password or app password
+SENDER_PASSWORD = "<cnfz gnxd icab odza>"  # Replace with your email password or app password
 RECIPIENT_EMAIL = "asimalsarhani@gmail.com"  # Recipient email
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
