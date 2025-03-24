@@ -48,10 +48,13 @@ def main():
         username_field.send_keys(SAP_USERNAME)
         password_field.send_keys(SAP_PASSWORD)
 
-        login_button = driver.find_element(By.ID, "loginButton")
+        # Use CSS selector to find the login button and click it
+        login_button = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#page_content > div:nth-child(9) > div > div > div.round.sfpanel > div > div > table > tbody > tr:nth-child(3) > td.button_row.mobileApplyButtonRow > span.aquabtn.active > span > button"))
+        )
         login_button.click()
 
-        # Wait for the page to load completely
+        # Wait for the page to load completely after login
         time.sleep(50)
 
         # Step 3: Scroll to the bottom of the page and click "Save" button
