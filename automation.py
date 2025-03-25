@@ -61,9 +61,8 @@ def main():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     try:
-        # Step 1: Navigate to the SAP portal sign-in page
-        SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
         print("Navigating to SAP sign-in page...")
+        SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
 
@@ -75,8 +74,10 @@ def main():
         username_field = driver.find_element(By.NAME, "username")
         password_field = driver.find_element(By.NAME, "password")
         username_field.send_keys(SAP_USERNAME)
+        print("Entered username.")
+
         password_field.send_keys(SAP_PASSWORD)
-        print("Credentials entered.")
+        print("Entered password.")
 
         sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
         sign_in_button.click()
