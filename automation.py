@@ -1,5 +1,9 @@
 import os
 import logging
+import smtplib
+import tempfile
+import time
+from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -8,183 +12,187 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import tempfile
-import smtplib
 
-# Configure logging with rotation
-log_handler = RotatingFileHandler(
-    "selenium_debug.log", maxBytes=5 * 1024 * 1024, backupCount=5
-)
-logging.basicConfig(handlers=[log_handler], level=logging.ERROR)
-
-# Retrieve credentials from environment variables
+# Environment variables configuration (original format)
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
+HEADLESS_MODE = os.environ.get("HEADLESS_MODE", "true").lower() == "true"
+
+# Configure logging
+log_format = "%(asctime)s - %(levelname)s - %(message)s"
+log_handler = RotatingFileHandler(
+    "selenium_debug.log",
+    maxBytes=5 * 1024 * 1024,
+    backupCount=5,
+    encoding="utf-8"
+)
+logging.basicConfig(
+    handlers=[log_handler],
+    level=logging.INFO,
+    format=log_format,
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
+
+# SMTP configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+SMTP_TIMEOUT = 10
 
-def send_email(screenshot_path):
-    """Send an email with the screenshot attachment."""
+class SAPPortalError(Exception):
+    """Custom exception for SAP portal interactions"""
+
+@contextmanager
+def webdriver_context() -> WebDriver:
+    """Context manager for WebDriver initialization and cleanup"""
+    driver = initialize_webdriver()
+    try:
+        yield driver
+    finally:
+        driver.quit()
+        logger.info("WebDriver session closed")
+
+def initialize_webdriver() -> WebDriver:
+    """Initialize and configure Chrome WebDriver"""
+    options = Options()
+    
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    
+    if HEADLESS_MODE:
+        options.add_argument("--headless=new")
+    
+    with tempfile.TemporaryDirectory() as user_data_dir:
+        options.add_argument(f"--user-data-dir={user_data_dir}")
+        try:
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logger.error("WebDriver initialization failed: %s", e)
+            raise
+
+def send_email(screenshot_path: str) -> None:
+    """Send email with screenshot attachment"""
     msg = MIMEMultipart()
     msg["From"] = SENDER_EMAIL
     msg["To"] = RECIPIENT_EMAIL
-    msg["Subject"] = "SAP Job Portal Screenshot"
+    msg["Subject"] = "SAP Job Portal Automation Report"
 
-    body = MIMEText(
-        "Please find attached the screenshot from the SAP job portal "
-        "automation.",
-        "plain"
+    body_text = (
+        "Please find attached the automation result "
+        "from the SAP job portal."
     )
-    msg.attach(body)
-
-    with open(screenshot_path, "rb") as img_file:
-        img = MIMEImage(img_file.read())
-        img.add_header(
-            "Content-Disposition",
-            "attachment",
-            filename=os.path.basename(screenshot_path)
-        )
-        msg.attach(img)
+    msg.attach(MIMEText(body_text, "plain"))
 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()  # Secure the connection
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(
-            SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string()
+        with open(screenshot_path, "rb") as img_file:
+            img = MIMEImage(img_file.read(), name=os.path.basename(screenshot_path))
+            msg.attach(img)
+    except IOError as e:
+        logger.error("Failed to attach screenshot: %s", e)
+        return
+
+    try:
+        with smtplib.SMTP(
+            SMTP_SERVER,
+            SMTP_PORT,
+            timeout=SMTP_TIMEOUT
+        ) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+            logger.info("Email sent to %s", RECIPIENT_EMAIL)
+    except smtplib.SMTPException as e:
+        logger.error("SMTP error: %s", e)
+
+def take_screenshot(driver: WebDriver, name: str) -> str:
+    """Take screenshot and return file path"""
+    filename = f"{name}_{int(time.time())}.png"
+    driver.save_screenshot(filename)
+    return filename
+
+def safe_click(driver: WebDriver, locator: tuple, timeout: int = 20) -> None:
+    """Safely click an element with error handling"""
+    try:
+        element = WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable(locator)
         )
-        server.quit()
-        logging.info(f"Email sent to {RECIPIENT_EMAIL}")
+        element.click()
     except Exception as e:
-        logging.error(f"Error sending email: {e}")
+        logger.error("Failed to click element %s: %s", locator, e)
+        raise SAPPortalError(f"Click failed on {locator}") from e
 
-def highlight_element(driver, element):
-    """Highlights a Selenium WebElement by changing its border color via JS."""
-    driver.execute_script(
-        "arguments[0].style.border='3px solid red'", element
+def sign_in(driver: WebDriver) -> None:
+    """Handle SAP portal authentication"""
+    login_url = (
+        "https://career23.sapsf.com/career?"
+        "career_company=saudiara05&lang=en_US"
     )
-
-def initialize_webdriver():
-    """Initialize the Chrome WebDriver with options."""
-    options = Options()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--remote-debugging-port=9222")
-
-    # Use a unique user-data directory
-    unique_dir = tempfile.mkdtemp()
-    options.add_argument(f"--user-data-dir={unique_dir}")
-
-    # Temporarily remove headless mode for debugging
-    # options.add_argument("--headless")
-
-    # Initialize WebDriver without specifying version
-    return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
-
-def sign_in(driver):
-    """Sign in to the SAP portal."""
-    SAP_SIGNIN_URL = (
-        f"https://{SAP_USERNAME}:{SAP_PASSWORD}"
-        "@career23.sapsf.com/career?career_company=saudiara05"
-        "&lang=en_US&company=saudiara05"
-    )
-    driver.get(SAP_SIGNIN_URL)
-    logging.info("Navigating to SAP sign-in page...")
-
-    # Wait for the login fields to be present
-    WebDriverWait(driver, 60).until(
-        EC.presence_of_element_located((By.NAME, "username"))
-    )
-    logging.info("Login fields detected on the page.")
-
-    # Perform sign in
-    username_field = driver.find_element(By.NAME, "username")
-    password_field = driver.find_element(By.NAME, "password")
-    username_field.send_keys(SAP_USERNAME)
-    password_field.send_keys(SAP_PASSWORD)
-    sign_in_button = driver.find_element(
-        By.XPATH, "//button[@data-testid='signInButton']"
-    )
-    sign_in_button.click()
-    logging.info("Sign in button clicked.")
-
-    # Wait for the URL to change after sign in
-    WebDriverWait(driver, 60).until(EC.url_changes(SAP_SIGNIN_URL))
-    logging.info(
-        "Sign in appears successful, URL changed to %s",
-        driver.current_url
-    )
-    driver.save_screenshot("login_success.png")
-
-def click_save_button(driver):
-    """Click the save button and handle potential errors."""
     try:
-        save_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[@data-testid='saveButton']")
-            )
+        driver.get(login_url)
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.NAME, "username"))
         )
-        save_button.click()
-        logging.info("Save button clicked.")
-        driver.save_screenshot("save_clicked.png")
+        
+        username_field = driver.find_element(By.NAME, "username")
+        password_field = driver.find_element(By.NAME, "password")
+        
+        username_field.send_keys(SAP_USERNAME)
+        password_field.send_keys(SAP_PASSWORD)
+        
+        safe_click(driver, (By.XPATH, "//button[@data-testid='signInButton']"))
+        
+        WebDriverWait(driver, 30).until(
+            lambda d: "login" not in d.current_url.lower()
+        )
+        take_screenshot(driver, "login_success")
+
     except Exception as e:
-        logging.error(f"Save button not found or not clickable: {e}")
+        screenshot = take_screenshot(driver, "login_error")
+        send_email(screenshot)
+        raise SAPPortalError("Login failed") from e
 
-def scroll_and_highlight_elements(driver):
-    """Scroll to and highlight specific elements on the page."""
+def execute_portal_actions(driver: WebDriver) -> None:
+    """Execute main portal actions"""
     try:
-        last_save_msg = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located(
-                (By.XPATH, "//*[@id='lastSaveTimeMsg']")
-            )
+        safe_click(driver, (By.XPATH, "//button[@data-testid='saveButton']"))
+        take_screenshot(driver, "save_confirmation")
+
+        WebDriverWait(driver, 30).until(
+            EC.visibility_of_element_located((By.ID, "lastSaveTimeMsg"))
         )
+        
+        system_messages = driver.find_element(By.ID, "2556:_sysMsgUl")
         driver.execute_script(
-            "arguments[0].scrollIntoView(true);", last_save_msg
+            "arguments[0].scrollIntoView({behavior: 'smooth'});",
+            system_messages
         )
-        highlight_element(driver, last_save_msg)
-        logging.info(
-            "Scrolled to and highlighted 'lastSaveTimeMsg'."
-        )
-    except Exception as e:
-        logging.error(
-            f"Could not find element with id 'lastSaveTimeMsg': {e}"
-        )
+        take_screenshot(driver, "system_messages")
 
-    try:
-        sys_msg_ul = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located(
-                (By.XPATH, "//*[@id='2556:_sysMsgUl']")
-            )
-        )
-        driver.execute_script(
-            "arguments[0].scrollIntoView(true);", sys_msg_ul
-        )
-        highlight_element(driver, sys_msg_ul)
-        logging.info(
-            "Scrolled to and highlighted '2556:_sysMsgUl'."
-        )
     except Exception as e:
-        logging.error(
-            f"Could not find element: {e}"
-        )
+        screenshot = take_screenshot(driver, "action_error")
+        send_email(screenshot)
+        raise SAPPortalError("Actions failed") from e
 
-def main():
-    driver = initialize_webdriver()
+def main() -> None:
+    """Main execution flow"""
     try:
-        sign_in(driver)
-        click_save_button(driver)
-        scroll_and_highlight_elements(driver)
-    finally:
-        driver.quit()
+        with webdriver_context() as driver:
+            sign_in(driver)
+            execute_portal_actions(driver)
+            success_screenshot = take_screenshot(driver, "final_result")
+            send_email(success_screenshot)
+    except Exception as e:
+        logger.error("Execution failed: %s", e)
+        raise
 
 if __name__ == "__main__":
     main()
