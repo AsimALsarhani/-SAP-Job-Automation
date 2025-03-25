@@ -68,8 +68,8 @@ def main():
     unique_dir = tempfile.mkdtemp()
     options.add_argument(f"--user-data-dir={unique_dir}")
     
-    # Run as headless browser
-    options.add_argument("--headless")
+    # Temporarily remove headless mode for debugging
+    # options.add_argument("--headless")
 
     # Initialize WebDriver without specifying version
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -162,11 +162,14 @@ def main():
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         print(f"An error occurred: {e}")
+        driver.save_screenshot("error_screenshot.png")
+        print("Error screenshot saved as 'error_screenshot.png'")
         # Save page source
         page_source_path = "error_page_source.html"
         with open(page_source_path, 'w') as f:
             f.write(driver.page_source)
         print(f"Page source saved at {page_source_path}")
+        logging.error(f"Error occurred at URL: {driver.current_url}")
 
     finally:
         driver.quit()
