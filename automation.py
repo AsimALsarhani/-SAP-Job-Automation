@@ -13,6 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import os
 import tempfile
 import smtplib
+import time
 
 # Configure logging with rotation
 log_handler = RotatingFileHandler(
@@ -104,7 +105,9 @@ def sign_in(driver):
     password_field = driver.find_element(By.NAME, "password")
     username_field.send_keys(SAP_USERNAME)
     password_field.send_keys(SAP_PASSWORD)
-    sign_in_button = driver.find_element(By.XPATH, "//button[@data-testid='signInButton']")
+    sign_in_button = driver.find_element(
+        By.XPATH, "//button[@data-testid='signInButton']"
+    )
     sign_in_button.click()
     logging.info("Sign in button clicked.")
 
