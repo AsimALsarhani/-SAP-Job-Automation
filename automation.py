@@ -54,9 +54,8 @@ def main():
     """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
     chrome_options = Options()
-    # Uncomment the next line for debugging (to see the browser)
-    # chrome_options.remove_argument("--headless")
-    chrome_options.add_argument("--headless")  # Comment this line to disable headless mode for debugging
+    # For debugging, consider disabling headless mode (comment out the next line)
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
@@ -81,9 +80,11 @@ def main():
         sign_in_button.click()
         print("Sign in button clicked.")
 
-        # Wait for URL change (increase timeout if needed)
+        # Wait for URL change after login; then capture a debug screenshot
         WebDriverWait(driver, 30).until(EC.url_changes(SAP_SIGNIN_URL))
-        print("Login successful, page URL changed.")
+        print("Login successful, URL changed to:", driver.current_url)
+        driver.save_screenshot("login_success.png")
+        print("Login screenshot saved as 'login_success.png'.")
 
         # Step 3: Click the Save button and wait for changes
         try:
@@ -92,11 +93,12 @@ def main():
             )
             save_button.click()
             print("Save button clicked.")
+            driver.save_screenshot("save_clicked.png")
+            print("Save click screenshot saved as 'save_clicked.png'.")
         except Exception as e:
             print("Save button not found or not clickable:", e)
 
-        # Wait for the save operation to complete
-        time.sleep(50)
+        time.sleep(50)  # Wait for the save operation to complete
 
         # Step 4: Scroll to the top
         driver.execute_script("window.scrollTo(0, 0);")
@@ -129,18 +131,18 @@ def main():
         driver.set_window_size(1920, 4000)
         time.sleep(2)
 
-        # Step 5: Capture the screenshot after all elements are in view
+        # Step 5: Capture the final screenshot after all elements are in view
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
-        print(f"Screenshot saved at {screenshot_path}")
+        print(f"Final screenshot saved at {screenshot_path}")
 
         # Step 6: Send the screenshot via email
         send_email(screenshot_path)
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        # Optionally, capture a debug screenshot here if needed:
         driver.save_screenshot("debug_error.png")
+        print("Debug error screenshot saved as 'debug_error.png'.")
     finally:
         driver.quit()
         print("Browser closed.")
