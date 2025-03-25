@@ -5,10 +5,9 @@ from logging.handlers import RotatingFileHandler
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 
 def setup_logging():
     log_formatter = logging.Formatter(
@@ -24,6 +23,17 @@ def setup_logging():
     logger.addHandler(log_handler)
     logging.info("Logging setup complete.")
 
+def initialize_driver():
+    try:
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")  # Run in headless mode
+        driver = webdriver.Chrome(options=options)
+        logging.info("WebDriver initialized successfully.")
+        return driver
+    except WebDriverException as e:
+        logging.error("Error initializing WebDriver: %s", e)
+        return None
+
 def login_to_website(driver, url, username, password):
     driver.get(url)
     logging.info("Opened website: %s", url)
@@ -32,12 +42,14 @@ def login_to_website(driver, url, username, password):
             EC.presence_of_element_located((By.NAME, "username"))
         )
         password_field = driver.find_element(By.NAME, "password")
+        login_button = driver.find_element(By.NAME, "login")  # Adjust selector if needed
+
         username_field.send_keys(username)
         password_field.send_keys(password)
-        password_field.send_keys(Keys.RETURN)
-        logging.info("Entered login credentials and submitted form.")
+        login_button.click()
+        
         WebDriverWait(driver, 10).until(EC.url_changes(url))
-        logging.info("Sign in appears successful, URL changed to %s", driver.current_url)
+        logging.info("Sign-in successful, URL changed to: %s", driver.current_url)
     except (NoSuchElementException, TimeoutException) as e:
         logging.error("Error during login: %s", e)
         driver.quit()
@@ -66,9 +78,12 @@ def extract_text(driver, element_id):
 
 def main():
     setup_logging()
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # Run in headless mode for efficiency
-    driver = webdriver.Chrome(options=options)
+    driver = initialize_driver()
+    
+    if driver is None:
+        logging.error("Driver initialization failed. Exiting script.")
+        return
+    
     try:
         login_to_website(
             driver, "https://example.com/login", "your_username", "your_password"
