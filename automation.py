@@ -23,26 +23,27 @@ SMTP_PORT = 587
 
 def send_email(screenshot_path):
     """Send an email with the screenshot attachment."""
+    print("Attempting to send email...")
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = RECIPIENT_EMAIL
     msg['Subject'] = "SAP Job Portal Screenshot"
-
+    
     body = MIMEText("Please find attached the screenshot from the SAP job portal automation.", 'plain')
     msg.attach(body)
-
+    
     with open(screenshot_path, 'rb') as img_file:
         img = MIMEImage(img_file.read())
         img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
         msg.attach(img)
-
+    
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()  # Secure the connection
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
         server.quit()
-        print(f"Email sent to {RECIPIENT_EMAIL}")
+        print(f"Email successfully sent to {RECIPIENT_EMAIL}")
     except Exception as e:
         print(f"Error sending email: {e}")
 
@@ -54,39 +55,40 @@ def main():
     """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
     chrome_options = Options()
-    # For debugging, comment out headless mode if needed:
+    # For debugging, you can comment out the next line to see the browser GUI:
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
+    
     try:
         # Step 1: Navigate to the SAP portal sign-in page
         SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+        print("Navigating to SAP sign-in page...")
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
-
+    
         # Wait for the login fields to be present
         WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.NAME, "username")))
         print("Login fields detected on the page.")
-
+    
         # Step 2: Perform sign in
         username_field = driver.find_element(By.NAME, "username")
         password_field = driver.find_element(By.NAME, "password")
         username_field.send_keys(SAP_USERNAME)
         password_field.send_keys(SAP_PASSWORD)
         print("Credentials entered.")
-
+    
         sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
         sign_in_button.click()
         print("Sign in button clicked.")
-
+    
         # Wait for the URL to change after sign in
         WebDriverWait(driver, 30).until(EC.url_changes(SAP_SIGNIN_URL))
         print("Sign in appears successful, URL changed to:", driver.current_url)
         driver.save_screenshot("login_success.png")
         print("Login screenshot saved as 'login_success.png'.")
-
+    
         # Step 3: Click the Save button and wait for changes
         try:
             save_button = WebDriverWait(driver, 20).until(
@@ -98,13 +100,13 @@ def main():
             print("Save click screenshot saved as 'save_clicked.png'.")
         except Exception as e:
             print("Save button not found or not clickable:", e)
-
+    
         time.sleep(50)  # Wait for the save operation to complete
-
+    
         # Step 4: Scroll to the top of the page
         driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
-
+    
         # Wait for and scroll to the target elements
         try:
             last_save_msg = WebDriverWait(driver, 30).until(
@@ -116,7 +118,7 @@ def main():
             time.sleep(2)
         except Exception as e:
             print("Could not find element with id 'lastSaveTimeMsg':", e)
-
+    
         try:
             sys_msg_ul = WebDriverWait(driver, 30).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
@@ -127,19 +129,19 @@ def main():
             time.sleep(2)
         except Exception as e:
             print("Could not find element with id '2556:_sysMsgUl':", e)
-
+    
         # Optional: Set a larger window size to capture more of the page
         driver.set_window_size(1920, 4000)
         time.sleep(2)
-
+    
         # Step 5: Capture the final screenshot after all elements are in view
         screenshot_path = "screenshot.png"
         driver.save_screenshot(screenshot_path)
         print(f"Final screenshot saved at {screenshot_path}")
-
+    
         # Step 6: Send the screenshot via email
         send_email(screenshot_path)
-
+    
     except Exception as e:
         print(f"An error occurred: {e}")
         # Save page source for debugging
@@ -147,6 +149,8 @@ def main():
         with open(page_source_path, 'w') as f:
             f.write(driver.page_source)
         print(f"Page source saved at {page_source_path}")
+        driver.save_screenshot("debug_error.png")
+        print("Debug error screenshot saved as 'debug_error.png'.")
     finally:
         driver.quit()
         print("Browser closed.")
