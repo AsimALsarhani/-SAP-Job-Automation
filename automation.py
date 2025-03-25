@@ -54,7 +54,9 @@ def main():
     """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run without GUI
+    # Uncomment the next line for debugging (to see the browser)
+    # chrome_options.remove_argument("--headless")
+    chrome_options.add_argument("--headless")  # Comment this line to disable headless mode for debugging
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
@@ -65,8 +67,9 @@ def main():
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
 
-        # Wait for the login fields
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, "username")))
+        # Wait for the login fields to be present
+        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.NAME, "username")))
+        print("Login fields are present.")
 
         # Step 2: Perform sign in
         username_field = driver.find_element(By.NAME, "username")
@@ -78,12 +81,13 @@ def main():
         sign_in_button.click()
         print("Sign in button clicked.")
 
-        # Wait for the page to load after login
-        WebDriverWait(driver, 15).until(EC.url_changes(SAP_SIGNIN_URL))
+        # Wait for URL change (increase timeout if needed)
+        WebDriverWait(driver, 30).until(EC.url_changes(SAP_SIGNIN_URL))
+        print("Login successful, page URL changed.")
 
         # Step 3: Click the Save button and wait for changes
         try:
-            save_button = WebDriverWait(driver, 10).until(
+            save_button = WebDriverWait(driver, 20).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]"))
             )
             save_button.click()
@@ -91,15 +95,16 @@ def main():
         except Exception as e:
             print("Save button not found or not clickable:", e)
 
-        time.sleep(50)  # Wait for the save operation to complete
+        # Wait for the save operation to complete
+        time.sleep(50)
 
-        # Step 4: Scroll to the top first
+        # Step 4: Scroll to the top
         driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(2)
 
         # Now wait for and scroll to the target elements
         try:
-            last_save_msg = WebDriverWait(driver, 20).until(
+            last_save_msg = WebDriverWait(driver, 30).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
             )
             driver.execute_script("arguments[0].scrollIntoView(true);", last_save_msg)
@@ -110,7 +115,7 @@ def main():
             print("Could not find element with id 'lastSaveTimeMsg':", e)
 
         try:
-            sys_msg_ul = WebDriverWait(driver, 20).until(
+            sys_msg_ul = WebDriverWait(driver, 30).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
             )
             driver.execute_script("arguments[0].scrollIntoView(true);", sys_msg_ul)
@@ -134,6 +139,8 @@ def main():
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        # Optionally, capture a debug screenshot here if needed:
+        driver.save_screenshot("debug_error.png")
     finally:
         driver.quit()
         print("Browser closed.")
