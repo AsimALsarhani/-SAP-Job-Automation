@@ -1,3 +1,4 @@
+import time  # Added to fix F821 undefined name 'time'
 import logging
 from logging.handlers import RotatingFileHandler
 from email.mime.text import MIMEText
@@ -13,7 +14,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 import os
 import tempfile
 import smtplib
-import time
 
 # Configure logging with rotation
 log_handler = RotatingFileHandler(
