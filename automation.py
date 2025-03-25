@@ -60,20 +60,19 @@ def main():
     """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
     options = Options()
-    # For debugging, comment out headless mode if needed:
-    # options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")
 
-    # Add a unique user-data directory
-    user_data_dir = tempfile.mkdtemp()
-    options.add_argument(f"--user-data-dir={user_data_dir}")
+    # Use a unique user-data directory
+    unique_dir = tempfile.mkdtemp()
+    options.add_argument(f"--user-data-dir={unique_dir}")
 
-    # Explicitly set Chrome binary path if needed
-    # options.binary_location = "/path/to/chrome"
+    # Run as headless browser
+    options.add_argument("--headless")
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    # Specify ChromeDriver version explicitly
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager(version="114.0.5735.90").install()), options=options)
 
     try:
         print("Navigating to SAP sign-in page...")
