@@ -1,7 +1,3 @@
-import time
-import os
-import smtplib
-import tempfile
 import logging
 from logging.handlers import RotatingFileHandler
 from email.mime.text import MIMEText
@@ -14,16 +10,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+import os
 
 # Configure logging with rotation
 log_handler = RotatingFileHandler("selenium_debug.log", maxBytes=5*1024*1024, backupCount=5)
 logging.basicConfig(handlers=[log_handler], level=logging.ERROR)
 
 # Retrieve credentials from environment variables
-SAP_USERNAME = os.environ.get("SAP_USERNAME")
-SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
+SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -63,11 +60,11 @@ def initialize_webdriver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")
-    
+
     # Use a unique user-data directory
     unique_dir = tempfile.mkdtemp()
     options.add_argument(f"--user-data-dir={unique_dir}")
-    
+
     # Temporarily remove headless mode for debugging
     # options.add_argument("--headless")
 
