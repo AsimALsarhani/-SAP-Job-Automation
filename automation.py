@@ -11,9 +11,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import os
+import tempfile
+import smtplib
 
 # Configure logging with rotation
-log_handler = RotatingFileHandler("selenium_debug.log", maxBytes=5*1024*1024, backupCount=5)
+log_handler = RotatingFileHandler(
+    "selenium_debug.log", maxBytes=5 * 1024 * 1024, backupCount=5
+)
 logging.basicConfig(handlers=[log_handler], level=logging.ERROR)
 
 # Retrieve credentials from environment variables
@@ -28,16 +32,23 @@ SMTP_PORT = 587
 def send_email(screenshot_path):
     """Send an email with the screenshot attachment."""
     msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = "SAP Job Portal Screenshot"
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = RECIPIENT_EMAIL
+    msg["Subject"] = "SAP Job Portal Screenshot"
 
-    body = MIMEText("Please find attached the screenshot from the SAP job portal automation.", 'plain')
+    body = MIMEText(
+        "Please find attached the screenshot from the SAP job portal automation.",
+        "plain"
+    )
     msg.attach(body)
 
-    with open(screenshot_path, 'rb') as img_file:
+    with open(screenshot_path, "rb") as img_file:
         img = MIMEImage(img_file.read())
-        img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
+        img.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=os.path.basename(screenshot_path)
+        )
         msg.attach(img)
 
     try:
@@ -69,16 +80,23 @@ def initialize_webdriver():
     # options.add_argument("--headless")
 
     # Initialize WebDriver without specifying version
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    return webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()), options=options
+    )
 
 def sign_in(driver):
     """Sign in to the SAP portal."""
-    SAP_SIGNIN_URL = f"https://{SAP_USERNAME}:{SAP_PASSWORD}@career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+    SAP_SIGNIN_URL = (
+        f"https://{SAP_USERNAME}:{SAP_PASSWORD}"
+        "@career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+    )
     driver.get(SAP_SIGNIN_URL)
     logging.info("Navigating to SAP sign-in page...")
 
     # Wait for the login fields to be present
-    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.NAME, "username")))
+    WebDriverWait(driver, 60).until(
+        EC.presence_of_element_located((By.NAME, "username"))
+    )
     logging.info("Login fields detected on the page.")
 
     # Perform sign in
@@ -136,7 +154,8 @@ def main():
     try:
         sign_in(driver)
         click_save_button(driver)
-        time.sleep(50)  # Wait for the save operation to complete
+        # Wait for the save operation to complete
+        time.sleep(50)
 
         # Scroll to the top of the page
         driver.execute_script("window.scrollTo(0, 0);")
@@ -160,9 +179,9 @@ def main():
         logging.error(f"An error occurred: {e}")
         driver.save_screenshot("error_screenshot.png")
         logging.info("Error screenshot saved as 'error_screenshot.png'")
-        # Save page source
+        # Save page source for debugging
         page_source_path = "error_page_source.html"
-        with open(page_source_path, 'w') as f:
+        with open(page_source_path, "w") as f:
             f.write(driver.page_source)
         logging.info(f"Page source saved at {page_source_path}")
         logging.error(f"Error occurred at URL: {driver.current_url}")
