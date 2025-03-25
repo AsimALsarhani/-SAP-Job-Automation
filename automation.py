@@ -174,4 +174,17 @@ def scroll_and_highlight_elements(driver):
         )
     except Exception as e:
         logging.error(
-            f"Could not find element ▋
+            f"Could not find element with id '2556:_sysMsgUl': {e}"
+        )
+
+def main():
+    driver = initialize_webdriver()
+    try:
+        sign_in(driver)
+        click_save_button(driver)
+        scroll_and_highlight_elements(driver)
+    finally:
+        driver.quit()
+
+if __name__ == "__main__":
+    main()
