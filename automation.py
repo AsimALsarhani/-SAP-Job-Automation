@@ -17,7 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Environment variables configuration (original format)
+# Environment variables configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
@@ -94,7 +94,8 @@ def send_email(screenshot_path: str) -> None:
 
     try:
         with open(screenshot_path, "rb") as img_file:
-            img = MIMEImage(img_file.read(), name=os.path.basename(screenshot_path))
+            img_data = img_file.read()
+            img = MIMEImage(img_data, name=os.path.basename(screenshot_path))
             msg.attach(img)
     except IOError as e:
         logger.error("Failed to attach screenshot: %s", e)
@@ -168,7 +169,6 @@ def execute_portal_actions(driver: WebDriver) -> None:
 
         WebDriverWait(driver, 30).until(
             EC.visibility_of_element_located((By.ID, "lastSaveTimeMsg"))
-        )
         
         system_messages = driver.find_element(By.ID, "2556:_sysMsgUl")
         driver.execute_script(
