@@ -141,7 +141,6 @@ def sign_in(driver: WebDriver) -> None:
         driver.get(login_url)
         WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.NAME, "username"))
-        )
         
         username_field = driver.find_element(By.NAME, "username")
         password_field = driver.find_element(By.NAME, "password")
