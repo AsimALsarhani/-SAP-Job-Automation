@@ -142,14 +142,14 @@ def main():
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        # Save page source
+        # Save page source for debugging
         page_source_path = "error_page_source.html"
         with open(page_source_path, 'w') as f:
             f.write(driver.page_source)
         print(f"Page source saved at {page_source_path}")
-
     finally:
         driver.quit()
+        print("Browser closed.")
 
 if __name__ == "__main__":
     main()
