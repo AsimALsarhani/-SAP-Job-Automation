@@ -1,3 +1,5 @@
+import os
+import time
 import logging
 from logging.handlers import RotatingFileHandler
 from email.mime.text import MIMEText
@@ -72,30 +74,28 @@ def initialize_webdriver():
     """Initialize the Chrome WebDriver with options."""
     options = Options()
     options.add_argument("--no-sandbox")
-    options.add_argument(
-        "--disable-dev-shm-usage"
-    )
+    options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")
 
     # Use a unique user-data directory
     unique_dir = tempfile.mkdtemp()
-    options.add_argument(
-        f"--user-data-dir={unique_dir}"
-    )
+    options.add_argument(f"--user-data-dir={unique_dir}")
 
     # Temporarily remove headless mode for debugging
     # options.add_argument("--headless")
 
     # Initialize WebDriver without specifying version
     return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=options
+        service=Service(ChromeDriverManager().install()),
+        options=options
     )
 
 def sign_in(driver):
     """Sign in to the SAP portal."""
     SAP_SIGNIN_URL = (
-        f"https://{SAP_USERNAME}:{SAP_PASSWORD}@career23.sapsf.com/"
-        "career?career_company=saudiara05&lang=en_US&company=saudiara05"
+        f"https://{SAP_USERNAME}:{SAP_PASSWORD}"
+        "@career23.sapsf.com/career?career_company=saudiara05"
+        "&lang=en_US&company=saudiara05"
     )
     driver.get(SAP_SIGNIN_URL)
     logging.info("Navigating to SAP sign-in page...")
