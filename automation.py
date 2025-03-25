@@ -63,16 +63,16 @@ def main():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")
-
+    
     # Use a unique user-data directory
     unique_dir = tempfile.mkdtemp()
     options.add_argument(f"--user-data-dir={unique_dir}")
-
+    
     # Run as headless browser
     options.add_argument("--headless")
 
-    # Specify ChromeDriver version explicitly
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager(version="114.0.5735.90").install()), options=options)
+    # Initialize WebDriver without specifying version
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     try:
         print("Navigating to SAP sign-in page...")
