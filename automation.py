@@ -2,6 +2,7 @@ import time
 import os
 import smtplib
 import tempfile
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -12,6 +13,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+
+# Configure logging
+logging.basicConfig(filename="selenium_debug.log", level=logging.ERROR)
 
 # Retrieve credentials from environment variables
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
@@ -45,6 +49,7 @@ def send_email(screenshot_path):
         server.quit()
         print(f"Email sent to {RECIPIENT_EMAIL}")
     except Exception as e:
+        logging.error(f"Error sending email: {e}")
         print(f"Error sending email: {e}")
 
 def highlight_element(driver, element):
@@ -65,11 +70,14 @@ def main():
     user_data_dir = tempfile.mkdtemp()
     options.add_argument(f"--user-data-dir={user_data_dir}")
 
+    # Explicitly set Chrome binary path if needed
+    # options.binary_location = "/path/to/chrome"
+
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     try:
         print("Navigating to SAP sign-in page...")
-        SAP_SIGNIN_URL = "https://career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+        SAP_SIGNIN_URL = f"https://{SAP_USERNAME}:{SAP_PASSWORD}@career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
         driver.get(SAP_SIGNIN_URL)
         print("SAP sign-in page loaded successfully.")
 
@@ -86,7 +94,7 @@ def main():
         password_field.send_keys(SAP_PASSWORD)
         print("Entered password.")
 
-        sign_in_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign In')]")
+        sign_in_button = driver.find_element(By.XPATH, "//button[@data-testid='signInButton']")
         sign_in_button.click()
         print("Sign in button clicked.")
 
@@ -99,13 +107,14 @@ def main():
         # Step 3: Click the Save button and wait for changes
         try:
             save_button = WebDriverWait(driver, 20).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Save')]"))
+                EC.element_to_be_clickable((By.XPATH, "//button[@data-testid='saveButton']"))
             )
             save_button.click()
             print("Save button clicked.")
             driver.save_screenshot("save_clicked.png")
             print("Save click screenshot saved as 'save_clicked.png'.")
         except Exception as e:
+            logging.error(f"Save button not found or not clickable: {e}")
             print("Save button not found or not clickable:", e)
 
         time.sleep(50)  # Wait for the save operation to complete
@@ -124,6 +133,7 @@ def main():
             print("Scrolled to and highlighted 'lastSaveTimeMsg'.")
             time.sleep(2)
         except Exception as e:
+            logging.error(f"Could not find element with id 'lastSaveTimeMsg': {e}")
             print("Could not find element with id 'lastSaveTimeMsg':", e)
 
         try:
@@ -135,6 +145,7 @@ def main():
             print("Scrolled to and highlighted '2556:_sysMsgUl'.")
             time.sleep(2)
         except Exception as e:
+            logging.error(f"Could not find element with id '2556:_sysMsgUl': {e}")
             print("Could not find element with id '2556:_sysMsgUl':", e)
 
         # Optional: Set a larger window size to capture more of the page
@@ -150,6 +161,7 @@ def main():
         send_email(screenshot_path)
 
     except Exception as e:
+        logging.error(f"An error occurred: {e}")
         print(f"An error occurred: {e}")
         # Save page source
         page_source_path = "error_page_source.html"
