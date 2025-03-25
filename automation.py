@@ -37,7 +37,8 @@ def send_email(screenshot_path):
     msg["Subject"] = "SAP Job Portal Screenshot"
 
     body = MIMEText(
-        "Please find attached the screenshot from the SAP job portal automation.",
+        "Please find attached the screenshot from the SAP job portal "
+        "automation.",
         "plain"
     )
     msg.attach(body)
