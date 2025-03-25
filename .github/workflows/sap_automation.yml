@@ -1,4 +1,4 @@
-name: Run SAP Automation
+name: SAP Job Automation Workflow
 
 on:
   push:
@@ -28,14 +28,14 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Lint and format Python code
+      - name: Run code formatting
         run: |
           source venv/bin/activate
-          pip install flake8 black
+          pip install black flake8
           black automation.py
           flake8 automation.py
 
-      - name: Run automation script
+      - name: Execute SAP Automation Script
         run: |
           source venv/bin/activate
           python automation.py
