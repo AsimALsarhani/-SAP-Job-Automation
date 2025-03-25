@@ -1,6 +1,7 @@
 import time
 import os
 import smtplib
+import tempfile
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -53,12 +54,18 @@ def highlight_element(driver, element):
 def main():
     """Main function to automate SAP job portal actions."""
     # Set up Chrome options and initialize WebDriver
-    chrome_options = Options()
+    options = Options()
     # For debugging, comment out headless mode if needed:
-    # chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    # options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--remote-debugging-port=9222")
+
+    # Add a unique user-data directory
+    user_data_dir = tempfile.mkdtemp()
+    options.add_argument(f"--user-data-dir={user_data_dir}")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     try:
         print("Navigating to SAP sign-in page...")
