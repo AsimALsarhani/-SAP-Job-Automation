@@ -63,8 +63,10 @@ def send_email(screenshot_path):
         logging.error(f"Error sending email: {e}")
 
 def highlight_element(driver, element):
-    """Highlights a Selenium WebElement by changing its border color via JavaScript."""
-    driver.execute_script("arguments[0].style.border='3px solid red'", element)
+    """Highlights a Selenium WebElement by changing its border color via JS."""
+    driver.execute_script(
+        "arguments[0].style.border='3px solid red'", element
+    )
 
 def initialize_webdriver():
     """Initialize the Chrome WebDriver with options."""
@@ -82,14 +84,16 @@ def initialize_webdriver():
 
     # Initialize WebDriver without specifying version
     return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=options
+        service=Service(ChromeDriverManager().install()),
+        options=options
     )
 
 def sign_in(driver):
     """Sign in to the SAP portal."""
     SAP_SIGNIN_URL = (
         f"https://{SAP_USERNAME}:{SAP_PASSWORD}"
-        "@career23.sapsf.com/career?career_company=saudiara05&lang=en_US&company=saudiara05"
+        "@career23.sapsf.com/career?career_company=saudiara05"
+        "&lang=en_US&company=saudiara05"
     )
     driver.get(SAP_SIGNIN_URL)
     logging.info("Navigating to SAP sign-in page...")
@@ -113,14 +117,17 @@ def sign_in(driver):
 
     # Wait for the URL to change after sign in
     WebDriverWait(driver, 60).until(EC.url_changes(SAP_SIGNIN_URL))
-    logging.info("Sign in appears successful, URL changed to %s", driver.current_url)
+    logging.info("Sign in appears successful, URL changed to %s",
+                 driver.current_url)
     driver.save_screenshot("login_success.png")
 
 def click_save_button(driver):
     """Click the save button and handle potential errors."""
     try:
         save_button = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@data-testid='saveButton']"))
+            EC.element_to_be_clickable(
+                (By.XPATH, "//button[@data-testid='saveButton']")
+            )
         )
         save_button.click()
         logging.info("Save button clicked.")
@@ -132,23 +139,35 @@ def scroll_and_highlight_elements(driver):
     """Scroll to and highlight specific elements on the page."""
     try:
         last_save_msg = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//*[@id='lastSaveTimeMsg']"))
+            EC.visibility_of_element_located(
+                (By.XPATH, "//*[@id='lastSaveTimeMsg']")
+            )
         )
-        driver.execute_script("arguments[0].scrollIntoView(true);", last_save_msg)
+        driver.execute_script(
+            "arguments[0].scrollIntoView(true);", last_save_msg
+        )
         highlight_element(driver, last_save_msg)
         logging.info("Scrolled to and highlighted 'lastSaveTimeMsg'.")
     except Exception as e:
-        logging.error(f"Could not find element with id 'lastSaveTimeMsg': {e}")
+        logging.error(
+            f"Could not find element with id 'lastSaveTimeMsg': {e}"
+        )
 
     try:
         sys_msg_ul = WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, "//*[@id='2556:_sysMsgUl']"))
+            EC.visibility_of_element_located(
+                (By.XPATH, "//*[@id='2556:_sysMsgUl']")
+            )
         )
-        driver.execute_script("arguments[0].scrollIntoView(true);", sys_msg_ul)
+        driver.execute_script(
+            "arguments[0].scrollIntoView(true);", sys_msg_ul
+        )
         highlight_element(driver, sys_msg_ul)
         logging.info("Scrolled to and highlighted '2556:_sysMsgUl'.")
     except Exception as e:
-        logging.error(f"Could not find element with id '2556:_sysMsgUl': {e}")
+        logging.error(
+            f"Could not find element with id '2556:_sysMsgUl': {e}"
+        )
 
 def main():
     """Main function to automate SAP job portal actions."""
