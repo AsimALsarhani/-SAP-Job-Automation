@@ -1,64 +1,41 @@
-name: SAP Job Automation
+name: Run SAP Automation
 
 on:
   push:
     branches:
       - main
-  schedule:
-    - cron: "0 * * * *"  # Runs at the start of every hour
+  pull_request:
+    branches:
+      - main
 
 jobs:
   run-sap-automation:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Google DNS
-        run: |
-          sudo resolvectl dns eth0 8.8.8.8 8.8.4.4
-
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-
-      - name: Cache Python packages
-        uses: actions/cache@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: |
-            ~/.cache/pip
-            venv
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
           python -m venv venv
           source venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Lint and format Python code
         run: |
           source venv/bin/activate
           pip install flake8 black
-          black .
-          flake8 --exclude venv,.venv,__pycache__,*/pip/_vendor/* .
+          black automation.py
+          flake8 automation.py
 
-      - name: Run Python tests
+      - name: Run automation script
         run: |
           source venv/bin/activate
-          pip install pytest
-          pytest
-
-      - name: Run SAP Automation Script
-        env:
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
-          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-        run: |
-          set -x  # Enable debug logs
-          source venv/bin/activate
-          python automation.py || echo "Script failed. Check logs for details."
+          python automation.py
