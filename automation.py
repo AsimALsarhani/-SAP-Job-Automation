@@ -17,7 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Environment variables configuration
+# Original environment variable configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
@@ -29,7 +29,7 @@ HEADLESS_MODE = os.environ.get("HEADLESS_MODE", "true").lower() == "true"
 log_format = "%(asctime)s - %(levelname)s - %(message)s"
 log_handler = RotatingFileHandler(
     "selenium_debug.log",
-    maxBytes=5 * 1024 * 1024,
+    maxBytes=5*1024*1024,
     backupCount=5,
     encoding="utf-8"
 )
@@ -94,8 +94,10 @@ def send_email(screenshot_path: str) -> None:
 
     try:
         with open(screenshot_path, "rb") as img_file:
-            img_data = img_file.read()
-            img = MIMEImage(img_data, name=os.path.basename(screenshot_path))
+            img = MIMEImage(
+                img_file.read(),
+                name=os.path.basename(screenshot_path)
+            )
             msg.attach(img)
     except IOError as e:
         logger.error("Failed to attach screenshot: %s", e)
@@ -141,6 +143,7 @@ def sign_in(driver: WebDriver) -> None:
         driver.get(login_url)
         WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.NAME, "username"))
+        )
         
         username_field = driver.find_element(By.NAME, "username")
         password_field = driver.find_element(By.NAME, "password")
