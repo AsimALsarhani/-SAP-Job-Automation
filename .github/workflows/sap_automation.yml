@@ -28,5 +28,5 @@ jobs:
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          SAP_URL: ${{ secrets.SAP_URL }}  # Provide a valid, resolvable SAP URL as a secret
+          SAP_URL: ${{ secrets.SAP_URL }}
         run: python automation.py
