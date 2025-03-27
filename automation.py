@@ -24,17 +24,17 @@ SMTP_PORT = 587
 
 # Set up Chrome options
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Run in headless mode if needed
+chrome_options.add_argument("--headless")  # Remove this option for visual debugging
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
-# Initialize WebDriver using ChromeDriverManager with options and service
+# Initialize WebDriver using ChromeDriverManager with service and options
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 try:
-    # Open SAP login page
-    driver.get("https://your.sap.login.page")  # Update with your SAP URL
+    # Open SAP login page (update the URL to your SAP login page)
+    driver.get("https://your.sap.login.page")
 
     # --- Login Steps (update these selectors as needed) ---
     username_field = WebDriverWait(driver, 30).until(
@@ -48,21 +48,21 @@ try:
     login_button = driver.find_element(By.ID, "loginButton")
     login_button.click()
 
-    # --- Wait for post-login page to load ---
+    # --- Wait for post-login page to load (update selector as needed) ---
     WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located((By.ID, "mainDashboard"))
     )
 
-    # --- Click the "Save" Button ---
+    # --- Click the "Save" Button (update the element ID as needed) ---
     save_button = WebDriverWait(driver, 30).until(
-        EC.element_to_be_clickable((By.ID, "saveButtonID"))  # Replace with actual ID
+        EC.element_to_be_clickable((By.ID, "saveButtonID"))
     )
     save_button.click()
 
-    # Wait for the save process to complete (prefer explicit wait if available)
+    # Wait for the save process to complete (replace time.sleep with explicit wait if possible)
     time.sleep(5)
 
-    # --- Scroll to the Last Update Date Element ---
+    # --- Scroll to the Last Update Date Element (update the element ID as needed) ---
     WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located((By.ID, "lastSaveTimeMsg"))
     )
