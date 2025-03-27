@@ -8,6 +8,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 
 # Original environment variable configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
@@ -20,8 +22,15 @@ RECIPIENT_EMAIL = "asimalsarhani@gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# Initialize WebDriver using ChromeDriverManager
-driver = webdriver.Chrome(ChromeDriverManager().install())
+# Set up Chrome options
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Run in headless mode if needed
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+
+# Initialize WebDriver using ChromeDriverManager with options and service
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
 try:
     # Open SAP login page
