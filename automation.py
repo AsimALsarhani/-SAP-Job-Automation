@@ -29,7 +29,7 @@ SMTP_PORT = 587
 
 # Set up Chrome options
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Remove for debugging if needed
+chrome_options.add_argument("--headless")  # Remove for debugging
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -61,6 +61,29 @@ def access_url_with_retry(url, max_attempts=3, delay=5):
         time.sleep(delay)
     return False
 
+def find_clickable_sign_in(timeout=45):
+    """
+    Iterates over candidate elements that contain the text "sign in" (ignoring case) and returns
+    the first element that is both visible and enabled. Returns None if not found within the timeout.
+    """
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        # Find candidates using XPath that checks normalized text (ignoring extra spaces and case)
+        candidates = driver.find_elements(
+            By.XPATH,
+            "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]"
+        )
+        if candidates:
+            for candidate in candidates:
+                try:
+                    if candidate.is_displayed() and candidate.is_enabled():
+                        print("Found clickable 'sign in' element.")
+                        return candidate
+                except Exception as ex:
+                    print("Error checking candidate element:", ex)
+        time.sleep(1)
+    return None
+
 try:
     # Access the SAP URL with retry logic.
     if not access_url_with_retry(SAP_URL):
@@ -75,15 +98,11 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    # Wait for the "Sign In" element using a robust XPath that looks for any element (button, input, or link)
-    # containing the text "sign in" (ignoring case and spaces)
-    sign_in_button = WebDriverWait(driver, 45).until(
-        EC.element_to_be_clickable(
-            (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
-        )
-    )
-    print("Found sign in button, clicking it.")
-    sign_in_button.click()
+    # Use custom function to locate and click the "Sign In" element
+    sign_in_element = find_clickable_sign_in(timeout=45)
+    if not sign_in_element:
+        raise TimeoutException("Could not find a clickable 'sign in' element within the timeout period.")
+    sign_in_element.click()
 
     # --- Wait for post-login page to load ---
     WebDriverWait(driver, 30).until(
