@@ -29,7 +29,7 @@ SMTP_PORT = 587
 
 # Set up Chrome options
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Remove for debugging
+chrome_options.add_argument("--headless")  # Remove this option for debugging if needed
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -40,18 +40,24 @@ driver = webdriver.Chrome(service=service, options=chrome_options)
 def access_url_with_retry(url, max_attempts=3, delay=5):
     """
     Attempts to access the given URL with retry logic.
+    Checks if document.readyState is 'complete' and if the login element (ID 'username') is present.
     """
     attempt = 0
     while attempt < max_attempts:
         try:
             print(f"Attempt {attempt + 1}: accessing {url}")
             driver.get(url)
-            # Check for a known substring that indicates the page loaded
-            if "sfPanelHeaderAnchor_2563_" in driver.page_source:
-                print("Page loaded successfully.")
+            # Wait briefly for the page to load.
+            time.sleep(3)
+            ready_state = driver.execute_script("return document.readyState")
+            print("Document ready state:", ready_state)
+            # Check for the login field presence.
+            login_elements = driver.find_elements(By.ID, "username")
+            if ready_state == "complete" and login_elements:
+                print("Page loaded successfully, login field found.")
                 return True
             else:
-                print("Expected element not found; page may not be fully loaded.")
+                print("Page not fully loaded: either readyState is not 'complete' or login element is missing.")
         except WebDriverException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
         attempt += 1
@@ -86,7 +92,7 @@ try:
     )
     save_button.click()
 
-    # Wait for the save process to complete (use explicit waits if available)
+    # Wait for the save process to complete (you may replace with explicit waits)
     time.sleep(5)
 
     # --- Scroll to the Last Update Date Element (update the element ID if needed) ---
