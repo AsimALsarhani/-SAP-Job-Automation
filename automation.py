@@ -76,9 +76,10 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    # Wait for the "Sign in" button to be clickable and click it.
+    # Wait for the "Sign In" button to be clickable.
+    # Using an XPath that locates a button containing the text "sign in" (case-insensitive)
     sign_in_button = WebDriverWait(driver, 30).until(
-        EC.element_to_be_clickable((By.ID, "signIn"))
+        EC.element_to_be_clickable((By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]"))
     )
     sign_in_button.click()
 
