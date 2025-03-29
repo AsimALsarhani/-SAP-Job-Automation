@@ -3,7 +3,7 @@ import time
 import smtplib
 from email.message import EmailMessage
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, NoSuchElementException
+from selenium.common.exceptions import WebDriverException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -29,7 +29,7 @@ SMTP_PORT = 587
 
 # Set up Chrome options
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Remove for debugging
+chrome_options.add_argument("--headless")  # Remove for debugging if needed
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -40,22 +40,21 @@ driver = webdriver.Chrome(service=service, options=chrome_options)
 def access_url_with_retry(url, max_attempts=3, delay=5):
     """
     Attempts to access the given URL with retry logic.
-    Checks if document.readyState is 'complete' and if the login element (ID 'username') is present.
+    Verifies document.readyState is complete and that the login field (ID 'username') is present.
     """
     attempt = 0
     while attempt < max_attempts:
         try:
             print(f"Attempt {attempt + 1}: accessing {url}")
             driver.get(url)
-            time.sleep(3)  # Allow the page to load
+            time.sleep(3)  # Allow page to load
             ready_state = driver.execute_script("return document.readyState")
             print("Document ready state:", ready_state)
-            login_elements = driver.find_elements(By.ID, "username")
-            if ready_state == "complete" and login_elements:
+            if ready_state == "complete" and driver.find_elements(By.ID, "username"):
                 print("Page loaded successfully, login field found.")
                 return True
             else:
-                print("Page not fully loaded: either readyState is not 'complete' or login element is missing.")
+                print("Page not fully loaded or login field missing.")
         except WebDriverException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
         attempt += 1
@@ -67,7 +66,7 @@ try:
     if not access_url_with_retry(SAP_URL):
         raise Exception("Failed to access SAP URL after multiple attempts.")
 
-    # --- Login Steps (update selectors if needed) ---
+    # --- Login Steps ---
     username_field = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.ID, "username"))
     )
@@ -76,36 +75,37 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    # Wait for the "Sign In" button to be clickable.
-    # Using an XPath that locates a button containing the text "sign in" (case-insensitive)
-    sign_in_button = WebDriverWait(driver, 30).until(
-        EC.element_to_be_clickable((By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]"))
+    # Wait for the "Sign In" element using a robust XPath that looks for any element (button, input, or link)
+    # containing the text "sign in" (ignoring case and spaces)
+    sign_in_button = WebDriverWait(driver, 45).until(
+        EC.element_to_be_clickable(
+            (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
+        )
     )
+    print("Found sign in button, clicking it.")
     sign_in_button.click()
 
-    # --- Wait for post-login page to load (update selector if needed) ---
+    # --- Wait for post-login page to load ---
     WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located((By.ID, "mainDashboard"))
     )
 
-    # --- Click the "Save" Button (update the element ID if needed) ---
+    # --- Click the "Save" Button ---
     save_button = WebDriverWait(driver, 30).until(
         EC.element_to_be_clickable((By.ID, "saveButtonID"))
     )
     save_button.click()
 
-    # Wait for the save process to complete (explicit waits can be used if available)
+    # Wait for the save process to complete
     time.sleep(5)
 
-    # --- Scroll to the Last Update Date Element (update the element ID if needed) ---
+    # --- Scroll to the Last Update Date Element ---
     WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located((By.ID, "lastSaveTimeMsg"))
     )
     last_update_element = driver.find_element(By.ID, "lastSaveTimeMsg")
     actions = ActionChains(driver)
     actions.move_to_element(last_update_element).perform()
-
-    # Allow dynamic content to update
     time.sleep(2)
 
     # --- Capture Screenshot ---
@@ -128,5 +128,11 @@ try:
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.send_message(msg)
 
+except TimeoutException as te:
+    print("Timeout waiting for an element:", te)
+    raise
+except Exception as e:
+    print("Error occurred:", e)
+    raise
 finally:
     driver.quit()
