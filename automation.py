@@ -12,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 
-# Environment variable configuration (secrets from GitHub)
+# Environment variable configuration (set these in GitHub secrets)
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
@@ -61,29 +61,6 @@ def access_url_with_retry(url, max_attempts=3, delay=5):
         time.sleep(delay)
     return False
 
-def find_clickable_sign_in(timeout=45):
-    """
-    Iterates over candidate elements that contain the text "sign in" (ignoring case) and returns
-    the first element that is both visible and enabled. Returns None if not found within the timeout.
-    """
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        # Find candidates using XPath that checks normalized text (ignoring extra spaces and case)
-        candidates = driver.find_elements(
-            By.XPATH,
-            "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]"
-        )
-        if candidates:
-            for candidate in candidates:
-                try:
-                    if candidate.is_displayed() and candidate.is_enabled():
-                        print("Found clickable 'sign in' element.")
-                        return candidate
-                except Exception as ex:
-                    print("Error checking candidate element:", ex)
-        time.sleep(1)
-    return None
-
 try:
     # Access the SAP URL with retry logic.
     if not access_url_with_retry(SAP_URL):
@@ -98,22 +75,37 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    # Use custom function to locate and click the "Sign In" element
-    sign_in_element = find_clickable_sign_in(timeout=45)
-    if not sign_in_element:
-        raise TimeoutException("Could not find a clickable 'sign in' element within the timeout period.")
-    sign_in_element.click()
+    # --- Locate the "Sign In" element with a robust XPath ---
+    # Using a longer timeout (60s) and trying a standard click first; if that fails, use JS click.
+    sign_in_element = WebDriverWait(driver, 60).until(
+        EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
+        )
+    )
+    print("Found 'sign in' element. Attempting to click...")
+    try:
+        # Attempt standard click
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
+            (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
+        ))
+        sign_in_element.click()
+        print("Standard click succeeded.")
+    except Exception as e:
+        print("Standard click failed, attempting JavaScript click:", e)
+        driver.execute_script("arguments[0].click();", sign_in_element)
 
     # --- Wait for post-login page to load ---
     WebDriverWait(driver, 30).until(
         EC.visibility_of_element_located((By.ID, "mainDashboard"))
     )
+    print("Post-login dashboard loaded.")
 
     # --- Click the "Save" Button ---
     save_button = WebDriverWait(driver, 30).until(
         EC.element_to_be_clickable((By.ID, "saveButtonID"))
     )
     save_button.click()
+    print("Clicked the 'Save' button.")
 
     # Wait for the save process to complete
     time.sleep(5)
@@ -130,6 +122,7 @@ try:
     # --- Capture Screenshot ---
     screenshot_path = "last_update.png"
     driver.save_screenshot(screenshot_path)
+    print("Screenshot captured.")
 
     # --- Send Email with Screenshot Attached ---
     msg = EmailMessage()
@@ -146,6 +139,7 @@ try:
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.send_message(msg)
+    print("Email sent successfully.")
 
 except TimeoutException as te:
     print("Timeout waiting for an element:", te)
