@@ -3,7 +3,7 @@ import time
 import smtplib
 from email.message import EmailMessage
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,7 +18,7 @@ SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
-SAP_URL = os.environ.get("SAP_URL")  # This MUST be set as a secret
+SAP_URL = os.environ.get("SAP_URL")  # Must be set as a secret
 
 if not SAP_URL:
     raise Exception("SAP_URL is not provided. Please set the SAP_URL environment variable.")
@@ -29,7 +29,7 @@ SMTP_PORT = 587
 
 # Set up Chrome options
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Remove this option for debugging if needed
+chrome_options.add_argument("--headless")  # Remove for debugging
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
@@ -47,11 +47,9 @@ def access_url_with_retry(url, max_attempts=3, delay=5):
         try:
             print(f"Attempt {attempt + 1}: accessing {url}")
             driver.get(url)
-            # Wait briefly for the page to load.
-            time.sleep(3)
+            time.sleep(3)  # Allow the page to load
             ready_state = driver.execute_script("return document.readyState")
             print("Document ready state:", ready_state)
-            # Check for the login field presence.
             login_elements = driver.find_elements(By.ID, "username")
             if ready_state == "complete" and login_elements:
                 print("Page loaded successfully, login field found.")
@@ -78,8 +76,11 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    login_button = driver.find_element(By.ID, "loginButton")
-    login_button.click()
+    # Wait for the "Sign in" button to be clickable and click it.
+    sign_in_button = WebDriverWait(driver, 30).until(
+        EC.element_to_be_clickable((By.ID, "signIn"))
+    )
+    sign_in_button.click()
 
     # --- Wait for post-login page to load (update selector if needed) ---
     WebDriverWait(driver, 30).until(
@@ -92,7 +93,7 @@ try:
     )
     save_button.click()
 
-    # Wait for the save process to complete (you may replace with explicit waits)
+    # Wait for the save process to complete (explicit waits can be used if available)
     time.sleep(5)
 
     # --- Scroll to the Last Update Date Element (update the element ID if needed) ---
