@@ -61,6 +61,27 @@ def access_url_with_retry(url, max_attempts=3, delay=5):
         time.sleep(delay)
     return False
 
+def find_clickable_sign_in(timeout=45):
+    """
+    Iterates over candidate elements that contain "sign in" (ignoring case) and returns the first clickable element.
+    """
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        candidates = driver.find_elements(
+            By.XPATH,
+            "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]"
+        )
+        if candidates:
+            for candidate in candidates:
+                try:
+                    if candidate.is_displayed() and candidate.is_enabled():
+                        print("Found clickable 'sign in' element.")
+                        return candidate
+                except Exception as ex:
+                    print("Error checking candidate element:", ex)
+        time.sleep(1)
+    return None
+
 try:
     # Access the SAP URL with retry logic.
     if not access_url_with_retry(SAP_URL):
@@ -75,27 +96,28 @@ try:
     password_field = driver.find_element(By.ID, "password")
     password_field.send_keys(SAP_PASSWORD)
 
-    # --- Locate the "Sign In" element with a robust XPath ---
-    # Using a longer timeout (60s) and trying a standard click first; if that fails, use JS click.
-    sign_in_element = WebDriverWait(driver, 60).until(
-        EC.presence_of_element_located(
-            (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
-        )
-    )
-    print("Found 'sign in' element. Attempting to click...")
+    # Locate the "Sign In" element using a custom finder and click it.
+    sign_in_element = find_clickable_sign_in(timeout=45)
+    if not sign_in_element:
+        raise TimeoutException("Could not find a clickable 'sign in' element within the timeout period.")
     try:
         # Attempt standard click
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
             (By.XPATH, "//*[contains(translate(normalize-space(string(.)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign in')]")
         ))
         sign_in_element.click()
-        print("Standard click succeeded.")
+        print("Standard click on 'sign in' succeeded.")
     except Exception as e:
-        print("Standard click failed, attempting JavaScript click:", e)
+        print("Standard click failed, using JavaScript click:", e)
         driver.execute_script("arguments[0].click();", sign_in_element)
 
+    # Log current URL after sign in for debugging.
+    time.sleep(3)
+    print("Current URL after sign in:", driver.current_url)
+
     # --- Wait for post-login page to load ---
-    WebDriverWait(driver, 30).until(
+    # Increase wait timeout to 60 seconds for page load.
+    WebDriverWait(driver, 60).until(
         EC.visibility_of_element_located((By.ID, "mainDashboard"))
     )
     print("Post-login dashboard loaded.")
@@ -107,7 +129,7 @@ try:
     save_button.click()
     print("Clicked the 'Save' button.")
 
-    # Wait for the save process to complete
+    # Wait for the save process to complete.
     time.sleep(5)
 
     # --- Scroll to the Last Update Date Element ---
