@@ -2,7 +2,7 @@ name: SAP Automation Workflow
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Hourly at :00
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,14 @@ jobs:
     - name: Configure X11
       run: |
         sudo apt-get update
-        sudo apt-get install -y xvfb libgbm1 libasound2
+        sudo add-apt-repository universe -y
+        sudo apt-get install -y \
+            xvfb \
+            libgbm1 \
+            libasound2-plugins \
+            libxshmfence1 \
+            libnss3 \
+            libdrm2
         Xvfb :99 -screen 0 1920x1080x24 &
         
     - name: Checkout code
