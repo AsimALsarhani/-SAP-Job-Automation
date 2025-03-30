@@ -2,12 +2,13 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs at the top of every hour
+    - cron: "0 * * * *"  # Runs hourly at :00
   workflow_dispatch:
 
 jobs:
   run-automation:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repository
@@ -16,11 +17,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
-          pip install selenium webdriver-manager schedule
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager
 
       - name: Run Automation Script
         env:
@@ -30,4 +32,14 @@ jobs:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
-        run: python automation.py
+        run: |
+          python automation.py || (echo "=== Error Log ===" && cat automation.log && exit 1)
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: automation-logs
+          path: |
+            automation.log
+            error_screenshot.png
