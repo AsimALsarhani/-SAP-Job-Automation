@@ -2,7 +2,7 @@ name: SAP Job Automation
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs hourly at :00
+    - cron: "0 * * * *"  # Hourly schedule
   workflow_dispatch:
 
 jobs:
@@ -12,10 +12,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4  # Updated from v3
+        uses: actions/checkout@v4  # Must be v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # Updated from v4
+        uses: actions/setup-python@v5  # Must be v5
         with:
           python-version: '3.10'
 
@@ -37,7 +37,7 @@ jobs:
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@v4  # Critical update from v3
+        uses: actions/upload-artifact@v4  # Critical fix
         with:
           name: automation-logs
           path: |
