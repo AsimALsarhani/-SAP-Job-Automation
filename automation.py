@@ -56,8 +56,8 @@ def initialize_browser():
     options.add_argument("--disable-dev-tools")
     options.add_argument("--ignore-certificate-errors")
     options.add_argument("--allow-insecure-localhost")
-    options.add_argument("--disable-features=ChromeWhatsNew")
-    options.add_argument("--disable-blink-features=AutomationControlled")  # add this
+    options.add_argument("--disable-features=ChromeWhatsNew")  # add this
+    options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--log-level=3")  # Add this
 
     service = ChromeService(ChromeDriverManager().install())
@@ -66,8 +66,7 @@ def initialize_browser():
     return driver
 
 
-
-def perform_login(driver, max_retries=5, retry_delay=5):
+def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries to 3
     """Execute login with robust error handling and retries"""
     for attempt in range(max_retries):
         try:
@@ -187,7 +186,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             logging.error(f"Page source: {driver.page_source}")
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
-                time.sleep(retry_delay)
+                time.sleep(retry_delay)  # Use the provided retry_delay
                 driver.refresh()
             else:
                 raise
@@ -201,7 +200,6 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 driver.refresh()
             else:
                 raise
-
 
 
 def send_report(screenshot_path):
@@ -225,7 +223,6 @@ def send_report(screenshot_path):
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
-
 
 
 def main_execution():
@@ -255,7 +252,6 @@ def main_execution():
         if driver:
             driver.quit()
             logging.info("Browser terminated")
-
 
 
 if __name__ == "__main__":
