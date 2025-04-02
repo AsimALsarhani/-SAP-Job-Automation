@@ -19,8 +19,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
 # Environment Configuration
-SAP_USERNAME = os.environ.get("SAP_USERNAME", "your-username")
-SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "your-password")
+SAP_USERNAME = os.environ.get("SAP_USERNAME")
+SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
@@ -55,7 +55,7 @@ def initialize_browser():
     options.add_argument("--disable-dev-tools")
     options.add_argument("--ignore-certificate-errors")
     options.add_argument("--allow-insecure-localhost")
-    options.add_argument("--disable-features=ChromeWhatsNew")  # Suppress "What's New" page
+    options.add_argument("--disable-features=ChromeWhatsNew")
 
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
@@ -86,10 +86,19 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Sign In Button (Corrected ID)
+            # Sign In Button
             logging.info("Waiting for Sign In button...")
+            # Use a combination of locators for robustness
             sign_in_button = WebDriverWait(driver, 30).until(
-                EC.element_to_be_clickable((By.ID, "signIn"))  # Corrected ID here
+                EC.presence_of_element_located(
+                    (By.ID, "signIn")
+                )
+                or EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "input[type='submit'][value='Sign In']")  # Added CSS Selector
+                )
+                or EC.presence_of_element_located(
+                    (By.XPATH, "//button[contains(text(),'Sign In')]") # Added XPath
+                )
             )
             logging.info("Sign In button found. Clicking.")
             sign_in_button.click()
@@ -100,7 +109,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
             )
             logging.info("Login successful")
-            return  # Exit the function if login succeeds
+            return
 
         except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
             logging.error(f"Login failure: {str(e)}")
@@ -122,7 +131,6 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 driver.refresh()
             else:
                 raise
-
 
 
 def send_report(screenshot_path):
@@ -148,6 +156,7 @@ def send_report(screenshot_path):
         raise
 
 
+
 def main_execution():
     """Main workflow controller"""
     driver = None
@@ -156,7 +165,7 @@ def main_execution():
         logging.info(f"Navigating to SAP portal: {SAP_URL}")
         driver.get(SAP_URL)
 
-        perform_login(driver)  # Login with retries
+        perform_login(driver)
 
         # Capture Evidence
         time.sleep(3)
