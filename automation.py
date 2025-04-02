@@ -10,6 +10,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     ElementNotInteractableException,
     StaleElementReferenceException,
+    NoSuchFrameException,
 )
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -68,6 +69,19 @@ def perform_login(driver, max_retries=5, retry_delay=5):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
 
+            # Navigate to the login URL
+            driver.get(SAP_URL)
+
+            # Handle potential frames (Added frame handling)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.frame_to_be_available_and_switch_to_it(0)
+                )
+                logging.info("Switched to frame (if present).")
+            except TimeoutException:
+                logging.info("No frame found, proceeding without switching.")
+                pass  # No frame, continue
+
             # Username Entry
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 30).until(
@@ -90,22 +104,16 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             logging.info("Waiting for Sign In button...")
             # Use a combination of locators for robustness
             sign_in_button = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located(
-                    (By.ID, "signIn")
-                )
-                or EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "input[type='submit'][value='Sign In']")  # Added CSS Selector
-                )
-                or EC.presence_of_element_located(
-                    (By.XPATH, "//button[contains(text(),'Sign In')]") # Added XPath
-                )
+                EC.element_to_be_clickable((By.ID, "signIn"))
+                or EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit'][value='Sign In']"))
+                or EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
             )
             logging.info("Sign In button found. Clicking.")
             sign_in_button.click()
 
-            # Post-Login Verification
+            # Post-Login Verification (Increased timeout)
             logging.info("Waiting for post-login verification element...")
-            WebDriverWait(driver, 45).until(
+            WebDriverWait(driver, 60).until(  # Increased timeout to 60 seconds
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
             )
             logging.info("Login successful")
@@ -124,6 +132,16 @@ def perform_login(driver, max_retries=5, retry_delay=5):
         except WebDriverException as e:
             logging.error(f"WebDriverException: {e}")
             driver.save_screenshot(f"webdriver_exception_{attempt + 1}.png")
+            logging.error(f"Page source: {driver.page_source}")
+            if attempt < max_retries - 1:
+                logging.info(f"Retrying login in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                driver.refresh()
+            else:
+                raise
+        except NoSuchFrameException as e: # Catch frame exceptions
+            logging.error(f"NoSuchFrameException: {e}")
+            driver.save_screenshot(f"frame_exception_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
