@@ -41,7 +41,7 @@ SMTP_PORT = 587
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()],
+    handlers=[logging.StreamHandler(), logging.FileHandler("automation.log")],  # Added file logging
 )
 
 
@@ -58,11 +58,13 @@ def initialize_browser():
     options.add_argument("--allow-insecure-localhost")
     options.add_argument("--disable-features=ChromeWhatsNew")
     options.add_argument("--disable-blink-features=AutomationControlled")  # add this
+    options.add_argument("--log-level=3")  # Add this
 
     service = ChromeService(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => false})")  # add this
     return driver
+
 
 
 def perform_login(driver, max_retries=5, retry_delay=5):
@@ -201,6 +203,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 raise
 
 
+
 def send_report(screenshot_path):
     """Send email with attachment"""
     try:
@@ -222,6 +225,7 @@ def send_report(screenshot_path):
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
+
 
 
 def main_execution():
@@ -253,6 +257,6 @@ def main_execution():
             logging.info("Browser terminated")
 
 
+
 if __name__ == "__main__":
     main_execution()
-
