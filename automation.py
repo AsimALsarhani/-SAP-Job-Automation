@@ -8,6 +8,8 @@ from selenium.common.exceptions import (
     WebDriverException,
     TimeoutException,
     NoSuchElementException,
+    ElementNotInteractableException,
+    StaleElementReferenceException,
 )
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -49,23 +51,30 @@ def initialize_browser():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920x1080")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-dev-tools")
+    options.add_argument("--ignore-certificate-errors")
+    options.add_argument("--allow-insecure-localhost")
+    options.add_argument("--disable-features=ChromeWhatsNew")  # Suppress "What's New" page
 
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
 
-def perform_login(driver, max_retries=3, retry_delay=5):
+
+def perform_login(driver, max_retries=5, retry_delay=5):
     """Execute login with robust error handling and retries"""
     for attempt in range(max_retries):
         try:
-            logging.info(f"Login attempt: {attempt + 1}")
+            logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
 
             # Username Entry
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.ID, "username"))
             )
-            logging.info("Username field found. Sending keys.")
+            logging.info("Username field found. Sending keys: %s", SAP_USERNAME)
+            username_field.clear()
             username_field.send_keys(SAP_USERNAME)
 
             # Password Entry
@@ -74,15 +83,16 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 EC.presence_of_element_located((By.ID, "password"))
             )
             logging.info("Password field found. Sending keys.")
+            password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Login Button
-            logging.info("Waiting for login button...")
-            login_button = WebDriverWait(driver, 30).until(
-                EC.element_to_be_clickable((By.ID, "signIn"))
+            # Sign In Button (Corrected ID)
+            logging.info("Waiting for Sign In button...")
+            sign_in_button = WebDriverWait(driver, 30).until(
+                EC.element_to_be_clickable((By.ID, "signIn"))  # Corrected ID here
             )
-            logging.info("Login button found. Clicking.")
-            login_button.click()
+            logging.info("Sign In button found. Clicking.")
+            sign_in_button.click()
 
             # Post-Login Verification
             logging.info("Waiting for post-login verification element...")
@@ -92,15 +102,27 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info("Login successful")
             return  # Exit the function if login succeeds
 
-        except (TimeoutException, NoSuchElementException) as e:
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
             logging.error(f"Login failure: {str(e)}")
             driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
-            logging.error(f"Page source: {driver.page_source}")  # Log page source
+            logging.error(f"Page source: {driver.page_source}")
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
                 time.sleep(retry_delay)
+                driver.refresh()
             else:
-                raise  # Re-raise the exception after max retries
+                raise
+        except WebDriverException as e:
+            logging.error(f"WebDriverException: {e}")
+            driver.save_screenshot(f"webdriver_exception_{attempt + 1}.png")
+            logging.error(f"Page source: {driver.page_source}")
+            if attempt < max_retries - 1:
+                logging.info(f"Retrying login in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                driver.refresh()
+            else:
+                raise
+
 
 
 def send_report(screenshot_path):
@@ -137,7 +159,7 @@ def main_execution():
         perform_login(driver)  # Login with retries
 
         # Capture Evidence
-        time.sleep(3)  # Stabilization
+        time.sleep(3)
         screenshot_path = "success_report.png"
         driver.save_screenshot(screenshot_path)
         logging.info(f"Screenshot captured: {screenshot_path}")
