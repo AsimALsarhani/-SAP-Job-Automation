@@ -44,7 +44,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), logging.FileHandler("automation.log")],  # Added file logging
 )
 
-
 def initialize_browser():
     """Configure Chrome with optimal headless settings"""
     options = Options()
@@ -56,17 +55,16 @@ def initialize_browser():
     options.add_argument("--disable-dev-tools")
     options.add_argument("--ignore-certificate-errors")
     options.add_argument("--allow-insecure-localhost")
-    options.add_argument("--disable-features=ChromeWhatsNew")  # add this
+    options.add_argument("--disable-features=ChromeWhatsNew")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--log-level=3")  # Add this
+    options.add_argument("--log-level=3")
 
     service = ChromeService(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => false})")  # add this
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => false})")
     return driver
 
-
-def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries to 3
+def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling and retries"""
     for attempt in range(max_retries):
         try:
@@ -77,7 +75,6 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
 
             # Optional: Remove frame-switching if not needed, or update the locator.
             try:
-                # Update locator if the frame exists; otherwise, comment this block out.
                 WebDriverWait(driver, 10).until(
                     EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
                 )
@@ -87,11 +84,11 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
 
             # Wait for the page to fully load and be interactive
             WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(1)  # brief pause may help in some cases
+            time.sleep(1)
 
             # Username Entry
             logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 60).until(  # Increased timeout
+            username_field = WebDriverWait(driver, 60).until(
                 EC.presence_of_element_located((By.ID, "username"))
             )
             logging.info("Username field found. Sending keys: %s", SAP_USERNAME)
@@ -109,30 +106,30 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
 
             # Sign In Button - try alternative locators if necessary.
             logging.info("Waiting for Sign In button...")
-            sign_in_button = None  # Initialize outside the try block
+            sign_in_button = None
             try:
-                sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
+                sign_in_button = WebDriverWait(driver, 60).until(
                     EC.element_to_be_clickable((By.ID, "signIn"))
                 )
                 logging.info("Sign In button found by ID.")
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying alternative locator.")
                 try:
-                    sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
+                    sign_in_button = WebDriverWait(driver, 60).until(
                         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
                     )
                     logging.info("Sign In button found by XPath.")
                 except TimeoutException:
                     logging.info("Sign In button not found by XPath, trying CSS Selector.")
                     try:
-                        sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
+                        sign_in_button = WebDriverWait(driver, 60).until(
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit']"))
                         )
                         logging.info("Sign In button found by CSS Selector.")
                     except TimeoutException:
                         logging.info("Sign In button not found by CSS Selector, trying name.")
                         try:
-                            sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
+                            sign_in_button = WebDriverWait(driver, 60).until(
                                 EC.element_to_be_clickable((By.NAME, "loginButton"))
                             )
                             logging.info("Sign In button found by Name.")
@@ -147,18 +144,17 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
             else:
                 raise NoSuchElementException("Failed to locate Sign In button using any locator.")
 
-            # Post-Login Verification & Error Handling (Crucial)
+            # Post-Login Verification & Error Handling
             logging.info("Waiting for post-login verification...")
             WebDriverWait(driver, 60).until(
                 EC.any_of(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content")),  # Success
-                    EC.presence_of_element_located((By.ID, "error-message")),  # Common error ID
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".error")),  # Common error CSS
-                    EC.title_contains("Error"),  # check the title
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content")),
+                    EC.presence_of_element_located((By.ID, "error-message")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".error")),
+                    EC.title_contains("Error"),
                 )
             )
 
-            # Check for specific error messages (Adapt these to your SAP system)
             if "error" in driver.page_source.lower() or "failed" in driver.page_source.lower():
                 logging.error("Login failed: Error message found on page.")
                 driver.save_screenshot("login_error_page.png")
@@ -186,7 +182,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
             logging.error(f"Page source: {driver.page_source}")
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
-                time.sleep(retry_delay)  # Use the provided retry_delay
+                time.sleep(retry_delay)
                 driver.refresh()
             else:
                 raise
@@ -200,7 +196,6 @@ def perform_login(driver, max_retries=3, retry_delay=5):  # Reduced max_retries 
                 driver.refresh()
             else:
                 raise
-
 
 def send_report(screenshot_path):
     """Send email with attachment"""
@@ -223,7 +218,6 @@ def send_report(screenshot_path):
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
-
 
 def main_execution():
     """Main workflow controller"""
@@ -252,7 +246,6 @@ def main_execution():
         if driver:
             driver.quit()
             logging.info("Browser terminated")
-
 
 if __name__ == "__main__":
     main_execution()
