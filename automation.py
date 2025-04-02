@@ -44,6 +44,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), logging.FileHandler("automation.log")],  # Added file logging
 )
 
+
 def initialize_browser():
     """Configure Chrome with optimal headless settings"""
     options = Options()
@@ -63,6 +64,8 @@ def initialize_browser():
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => false})")
     return driver
+
+
 
 def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling and retries"""
@@ -197,6 +200,8 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             else:
                 raise
 
+
+
 def send_report(screenshot_path):
     """Send email with attachment"""
     try:
@@ -218,6 +223,8 @@ def send_report(screenshot_path):
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
+
+
 
 def main_execution():
     """Main workflow controller"""
@@ -246,6 +253,8 @@ def main_execution():
         if driver:
             driver.quit()
             logging.info("Browser terminated")
+
+
 
 if __name__ == "__main__":
     main_execution()
