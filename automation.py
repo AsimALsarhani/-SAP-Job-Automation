@@ -38,7 +38,7 @@ def initialize_browser():
     user_data_dir = tempfile.mkdtemp()
     options = Options()
     options.add_argument(f"--user-data-dir={user_data_dir}")
-    options.add_argument("--headless")  # Remove if you want to see the browser
+    options.add_argument("--headless")  # Remove this flag if you need a visible browser for debugging
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
@@ -55,7 +55,7 @@ def access_url_with_retry(driver, url, max_attempts=3, delay=5):
         try:
             logging.info(f"Attempt {attempt + 1}: accessing {url}")
             driver.get(url)
-            time.sleep(3)
+            time.sleep(3)  # Allow the page to load
             ready_state = driver.execute_script("return document.readyState")
             logging.info(f"Document ready state: {ready_state}")
             if ready_state == "complete" and driver.find_elements(By.ID, "username"):
@@ -72,25 +72,28 @@ def access_url_with_retry(driver, url, max_attempts=3, delay=5):
 def perform_login(driver):
     """
     Performs login actions on the SAP login page.
-    Assumes the page is loaded.
+    Assumes the page is already loaded.
     """
     try:
+        # Wait for username field and enter credentials
         username_field = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.ID, "username"))
         )
         username_field.send_keys(SAP_USERNAME)
+        logging.info("Entered username.")
         
         password_field = driver.find_element(By.ID, "password")
         password_field.send_keys(SAP_PASSWORD)
+        logging.info("Entered password.")
         
         # Wait for and click the "Sign In" button (assumed to have ID 'signIn')
         sign_in_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.ID, "signIn"))
         )
         sign_in_button.click()
-        logging.info("Login action performed successfully.")
+        logging.info("Clicked 'Sign In' button.")
         
-        # Wait for a post-login element (adjust selector as needed)
+        # Wait for a post-login element to ensure login succeeded
         WebDriverWait(driver, 30).until(
             EC.visibility_of_element_located((By.ID, "mainDashboard"))
         )
@@ -101,7 +104,7 @@ def perform_login(driver):
 
 def send_email_with_screenshot(screenshot_path):
     """
-    Sends an email with the given screenshot attached.
+    Sends an email with the screenshot attached.
     """
     try:
         msg = EmailMessage()
@@ -132,7 +135,7 @@ def main():
         
         perform_login(driver)
         
-        # Capture screenshot after login
+        # Capture a screenshot after login
         screenshot_path = "screenshot.png"
         time.sleep(5)  # Allow dynamic content to load
         driver.save_screenshot(screenshot_path)
