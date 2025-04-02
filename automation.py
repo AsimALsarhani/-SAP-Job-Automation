@@ -65,7 +65,6 @@ def initialize_browser():
     return driver
 
 
-
 def perform_login(driver, max_retries=5, retry_delay=5):
     """Execute login with robust error handling and retries"""
     for attempt in range(max_retries):
@@ -114,17 +113,33 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 sign_in_button = WebDriverWait(driver, 40).until(
                     EC.element_to_be_clickable((By.ID, "signIn"))
                 )
+                logging.info("Sign In button found by ID.")
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying alternative locator.")
                 try:
                     sign_in_button = WebDriverWait(driver, 40).until(
                         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
                     )
+                    logging.info("Sign In button found by XPath.")
                 except TimeoutException:
                     logging.info("Sign In button not found by XPath, trying CSS Selector.")
-                    sign_in_button = WebDriverWait(driver, 40).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit']"))
-                    )
+                    try:
+                        sign_in_button = WebDriverWait(driver, 40).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit']"))
+                        )
+                        logging.info("Sign In button found by CSS Selector.")
+                    except TimeoutException:
+                        logging.info("Sign In button not found by CSS Selector, trying name.")
+                        try:
+                            sign_in_button = WebDriverWait(driver, 40).until(
+                                EC.element_to_be_clickable((By.NAME, "loginButton"))
+                            )
+                            logging.info("Sign In button found by Name.")
+                        except TimeoutException:
+                            logging.error("Sign In button not found using any locator.")
+                            raise NoSuchElementException(
+                                "Failed to locate Sign In button using any locator."
+                            )
             if sign_in_button:
                 logging.info("Sign In button found. Clicking.")
                 driver.execute_script("arguments[0].click();", sign_in_button)
@@ -151,13 +166,20 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             if "Sign In" in driver.title:
                 logging.error("Login Failed: Still on Sign In Page")
                 driver.save_screenshot("login_error_signin_page.png")
-                raise WebDriverException("Login failed: Still on Sign In page after attempting login.")
-            
+                raise WebDriverException(
+                    "Login failed: Still on Sign In page after attempting login."
+                )
+
             logging.info("Login successful")
             return
 
-        except (TimeoutException, NoSuchElementException, ElementNotInteractableException,
-                StaleElementReferenceException, WebDriverException) as e:
+        except (
+            TimeoutException,
+            NoSuchElementException,
+            ElementNotInteractableException,
+            StaleElementReferenceException,
+            WebDriverException,
+        ) as e:
             logging.error(f"Login failure: {str(e)}")
             driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
@@ -200,7 +222,6 @@ def send_report(screenshot_path):
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
-
 
 
 def main_execution():
