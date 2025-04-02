@@ -75,19 +75,22 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             # Navigate to the login URL
             driver.get(SAP_URL)
 
-            # Handle potential frames
+            # Optional: Remove frame-switching if not needed, or update the locator.
             try:
+                # Update locator if the frame exists; otherwise, comment this block out.
                 WebDriverWait(driver, 10).until(
-                    EC.frame_to_be_available_and_switch_to_it(0)
+                    EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
                 )
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
-                pass
+
+            # Wait for the page to fully load by optionally checking for a loading indicator.
+            time.sleep(1)  # brief pause may help in some cases
 
             # Username Entry
             logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 30).until(
+            username_field = WebDriverWait(driver, 40).until(
                 EC.presence_of_element_located((By.ID, "username"))
             )
             logging.info("Username field found. Sending keys: %s", SAP_USERNAME)
@@ -96,25 +99,26 @@ def perform_login(driver, max_retries=5, retry_delay=5):
 
             # Password Entry
             logging.info("Waiting for password field...")
-            password_field = WebDriverWait(driver, 20).until(
+            password_field = WebDriverWait(driver, 40).until(
                 EC.presence_of_element_located((By.ID, "password"))
             )
             logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Sign In Button
+            # Sign In Button - try alternative locators if necessary.
             logging.info("Waiting for Sign In button...")
-            # Use a combination of locators for robustness
-            sign_in_button = WebDriverWait(driver, 30).until(
-                EC.element_to_be_clickable((By.ID, "signIn"))
-                or EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit'][value='Sign In']"))
-                or EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
-            )
+            try:
+                sign_in_button = WebDriverWait(driver, 40).until(
+                    EC.element_to_be_clickable((By.ID, "signIn"))
+                )
+            except TimeoutException:
+                logging.info("Sign In button not found by ID, trying alternative locator.")
+                sign_in_button = WebDriverWait(driver, 40).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
+                )
             logging.info("Sign In button found. Clicking.")
-            # Use Javascript to click the button (Added this)
             driver.execute_script("arguments[0].click();", sign_in_button)
-
 
             # Post-Login Verification
             logging.info("Waiting for post-login verification element...")
@@ -124,7 +128,8 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             logging.info("Login successful")
             return
 
-        except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException,
+                StaleElementReferenceException) as e:
             logging.error(f"Login failure: {str(e)}")
             driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
@@ -212,3 +217,4 @@ def main_execution():
 
 if __name__ == "__main__":
     main_execution()
+
