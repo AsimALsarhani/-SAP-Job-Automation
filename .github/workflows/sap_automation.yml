@@ -38,4 +38,5 @@ jobs:
         RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
         SAP_URL: ${{ secrets.SAP_URL }}
       run: |
+        set -x  # Enable detailed logging
         python automation.py
