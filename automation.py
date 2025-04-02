@@ -20,8 +20,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
 # Environment Configuration
-SAP_USERNAME = os.environ.get("SAP_USERNAME")
-SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
+SAP_USERNAME = os.environ.get("SAP_USERNAME", "asim.s.alsarhani@gmail.com")
+SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "AbuSY@1990")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
