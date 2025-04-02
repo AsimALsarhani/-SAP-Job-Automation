@@ -4,7 +4,11 @@ import logging
 import smtplib
 from email.message import EmailMessage
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, TimeoutException, NoSuchElementException
+from selenium.common.exceptions import (
+    WebDriverException,
+    TimeoutException,
+    NoSuchElementException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -34,8 +38,9 @@ SMTP_PORT = 587
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
+    handlers=[logging.StreamHandler()],
 )
+
 
 def initialize_browser():
     """Configure Chrome with optimal headless settings"""
@@ -44,36 +49,59 @@ def initialize_browser():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920x1080")
-    
+
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
-def perform_login(driver):
-    """Execute login with robust error handling"""
-    try:
-        # Username Entry
-        WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.ID, "username"))
-        ).send_keys(SAP_USERNAME)
-        
-        # Password Entry
-        driver.find_element(By.ID, "password").send_keys(SAP_PASSWORD)
-        
-        # Login Button
-        WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.ID, "signIn"))
-        ).click()
-        
-        # Post-Login Verification (FIXED SYNTAX)
-        WebDriverWait(driver, 45).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
-        )
-        logging.info("Login successful")
-        
-    except (TimeoutException, NoSuchElementException) as e:
-        logging.error(f"Login failure: {str(e)}")
-        driver.save_screenshot("login_failure.png")
-        raise
+
+def perform_login(driver, max_retries=3, retry_delay=5):
+    """Execute login with robust error handling and retries"""
+    for attempt in range(max_retries):
+        try:
+            logging.info(f"Login attempt: {attempt + 1}")
+
+            # Username Entry
+            logging.info("Waiting for username field...")
+            username_field = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.ID, "username"))
+            )
+            logging.info("Username field found. Sending keys.")
+            username_field.send_keys(SAP_USERNAME)
+
+            # Password Entry
+            logging.info("Waiting for password field...")
+            password_field = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.ID, "password"))
+            )
+            logging.info("Password field found. Sending keys.")
+            password_field.send_keys(SAP_PASSWORD)
+
+            # Login Button
+            logging.info("Waiting for login button...")
+            login_button = WebDriverWait(driver, 30).until(
+                EC.element_to_be_clickable((By.ID, "signIn"))
+            )
+            logging.info("Login button found. Clicking.")
+            login_button.click()
+
+            # Post-Login Verification
+            logging.info("Waiting for post-login verification element...")
+            WebDriverWait(driver, 45).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
+            )
+            logging.info("Login successful")
+            return  # Exit the function if login succeeds
+
+        except (TimeoutException, NoSuchElementException) as e:
+            logging.error(f"Login failure: {str(e)}")
+            driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
+            logging.error(f"Page source: {driver.page_source}")  # Log page source
+            if attempt < max_retries - 1:
+                logging.info(f"Retrying login in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                raise  # Re-raise the exception after max retries
+
 
 def send_report(screenshot_path):
     """Send email with attachment"""
@@ -83,19 +111,20 @@ def send_report(screenshot_path):
         msg["From"] = SENDER_EMAIL
         msg["To"] = RECIPIENT_EMAIL
         msg.set_content("Process completed. See attached report.")
-        
+
         with open(screenshot_path, "rb") as f:
             msg.add_attachment(f.read(), maintype="image", subtype="png", filename="report.png")
-        
+
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         logging.info("Email dispatched successfully")
-        
+
     except smtplib.SMTPException as e:
         logging.error(f"Email failure: {str(e)}")
         raise
+
 
 def main_execution():
     """Main workflow controller"""
@@ -104,17 +133,17 @@ def main_execution():
         driver = initialize_browser()
         logging.info(f"Navigating to SAP portal: {SAP_URL}")
         driver.get(SAP_URL)
-        
-        perform_login(driver)
-        
+
+        perform_login(driver)  # Login with retries
+
         # Capture Evidence
         time.sleep(3)  # Stabilization
         screenshot_path = "success_report.png"
         driver.save_screenshot(screenshot_path)
         logging.info(f"Screenshot captured: {screenshot_path}")
-        
+
         send_report(screenshot_path)
-        
+
     except Exception as e:
         logging.error(f"Critical failure: {str(e)}", exc_info=True)
         if driver:
@@ -124,6 +153,7 @@ def main_execution():
         if driver:
             driver.quit()
             logging.info("Browser terminated")
+
 
 if __name__ == "__main__":
     main_execution()
