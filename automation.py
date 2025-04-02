@@ -90,7 +90,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
 
             # Username Entry
             logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 40).until(
+            username_field = WebDriverWait(driver, 60).until(  # Increased timeout
                 EC.presence_of_element_located((By.ID, "username"))
             )
             logging.info("Username field found. Sending keys: %s", SAP_USERNAME)
@@ -99,7 +99,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
 
             # Password Entry
             logging.info("Waiting for password field...")
-            password_field = WebDriverWait(driver, 40).until(
+            password_field = WebDriverWait(driver, 60).until(
                 EC.presence_of_element_located((By.ID, "password"))
             )
             logging.info("Password field found. Sending keys.")
@@ -110,28 +110,28 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             logging.info("Waiting for Sign In button...")
             sign_in_button = None  # Initialize outside the try block
             try:
-                sign_in_button = WebDriverWait(driver, 40).until(
+                sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
                     EC.element_to_be_clickable((By.ID, "signIn"))
                 )
                 logging.info("Sign In button found by ID.")
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying alternative locator.")
                 try:
-                    sign_in_button = WebDriverWait(driver, 40).until(
+                    sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
                         EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
                     )
                     logging.info("Sign In button found by XPath.")
                 except TimeoutException:
                     logging.info("Sign In button not found by XPath, trying CSS Selector.")
                     try:
-                        sign_in_button = WebDriverWait(driver, 40).until(
+                        sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
                             EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='submit']"))
                         )
                         logging.info("Sign In button found by CSS Selector.")
                     except TimeoutException:
                         logging.info("Sign In button not found by CSS Selector, trying name.")
                         try:
-                            sign_in_button = WebDriverWait(driver, 40).until(
+                            sign_in_button = WebDriverWait(driver, 60).until(  # Increased timeout
                                 EC.element_to_be_clickable((By.NAME, "loginButton"))
                             )
                             logging.info("Sign In button found by Name.")
