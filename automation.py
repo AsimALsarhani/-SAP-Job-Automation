@@ -44,7 +44,6 @@ def initialize_browser():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920x1080")
-    options.add_argument("--disable-gpu")
     
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
@@ -65,7 +64,7 @@ def perform_login(driver):
             EC.element_to_be_clickable((By.ID, "signIn"))
         ).click()
         
-        # Post-Login Verification
+        # Post-Login Verification (FIXED SYNTAX)
         WebDriverWait(driver, 45).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
         )
