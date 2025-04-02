@@ -5,7 +5,7 @@ import smtplib
 import tempfile
 from email.message import EmailMessage
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, TimeoutException
+from selenium.common.exceptions import WebDriverException, TimeoutException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -21,134 +21,102 @@ SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
 SAP_URL = os.environ.get("SAP_URL")  # Must be set as a secret
 
-if not SAP_URL:
-    raise Exception("SAP_URL is not provided. Please set the SAP_URL environment variable.")
+# Validate mandatory SAP_URL
+if not SAP_URL or SAP_URL == "your-sap-url":
+    raise ValueError("SAP_URL environment variable must be set and valid")
 
-# Email SMTP configuration (Gmail)
+# Email configuration
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# Initialize logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 
-def initialize_browser():
-    """
-    Initialize the Chrome WebDriver with a unique user data directory.
-    """
-    user_data_dir = tempfile.mkdtemp()
+def initialize_driver():
+    """Initialize Chrome WebDriver with enhanced options"""
     options = Options()
-    options.add_argument(f"--user-data-dir={user_data_dir}")
-    options.add_argument("--headless")  # Remove this flag if you need a visible browser for debugging
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-    logging.info(f"Browser initialized with user data directory: {user_data_dir}")
-    return driver
+    options.add_argument("--window-size=1920x1080")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    
+    service = ChromeService(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=options)
 
-def access_url_with_retry(driver, url, max_attempts=3, delay=5):
-    """
-    Attempts to access the given URL with retry logic.
-    Verifies document.readyState is complete and that the login field (ID 'username') is present.
-    """
-    attempt = 0
-    while attempt < max_attempts:
-        try:
-            logging.info(f"Attempt {attempt + 1}: accessing {url}")
-            driver.get(url)
-            time.sleep(3)  # Allow the page to load
-            ready_state = driver.execute_script("return document.readyState")
-            logging.info(f"Document ready state: {ready_state}")
-            if ready_state == "complete" and driver.find_elements(By.ID, "username"):
-                logging.info("Page loaded successfully; login field found.")
-                return True
-            else:
-                logging.info("Page not fully loaded or login field missing.")
-        except WebDriverException as e:
-            logging.error(f"Attempt {attempt + 1} failed: {e}")
-        attempt += 1
-        time.sleep(delay)
-    return False
-
-def perform_login(driver):
-    """
-    Performs login actions on the SAP login page.
-    Assumes the page is already loaded.
-    """
+def handle_login(driver):
+    """Handle SAP login process with improved reliability"""
     try:
-        # Wait for username field and enter credentials
-        username_field = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.ID, "username"))
-        )
-        username_field.send_keys(SAP_USERNAME)
-        logging.info("Entered username.")
-        
-        password_field = driver.find_element(By.ID, "password")
-        password_field.send_keys(SAP_PASSWORD)
-        logging.info("Entered password.")
-        
-        # Wait for and click the "Sign In" button (assumed to have ID 'signIn')
-        sign_in_button = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.ID, "signIn"))
-        )
-        sign_in_button.click()
-        logging.info("Clicked 'Sign In' button.")
-        
-        # Wait for a post-login element to ensure login succeeded
         WebDriverWait(driver, 30).until(
-            EC.visibility_of_element_located((By.ID, "mainDashboard"))
-        )
-        logging.info("Post-login dashboard loaded successfully.")
-    except Exception as e:
-        logging.error(f"Login failed: {e}")
-        raise Exception("Login failed") from e
+            EC.presence_of_element_located((By.ID, "username"))
+        ).send_keys(SAP_USERNAME)
+        
+        driver.find_element(By.ID, "password").send_keys(SAP_PASSWORD)
+        
+        WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.ID, "signIn"))
+        ).click()
+        
+        # Verify successful login
+        WebDriverWait(driver, 45).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
+        logging.info("Login successful")
+    except (TimeoutException, NoSuchElementException) as e:
+        logging.error(f"Login failed: {str(e)}")
+        raise
 
-def send_email_with_screenshot(screenshot_path):
-    """
-    Sends an email with the screenshot attached.
-    """
+def send_email_notification(screenshot_path):
+    """Send email with enhanced error handling"""
     try:
         msg = EmailMessage()
-        msg["Subject"] = "SAP Job Automation - Screenshot"
+        msg["Subject"] = "SAP Automation Report"
         msg["From"] = SENDER_EMAIL
         msg["To"] = RECIPIENT_EMAIL
-        msg.set_content("Attached is the screenshot from SAP Job Automation.")
+        msg.set_content("SAP automation process completed. See attached screenshot.")
         
         with open(screenshot_path, "rb") as f:
-            img_data = f.read()
-        msg.add_attachment(img_data, maintype="image", subtype="png", filename="screenshot.png")
+            msg.add_attachment(f.read(), maintype="image", subtype="png", filename="report.png")
         
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
-        logging.info("Email sent successfully.")
-    except Exception as e:
-        logging.error(f"Sending email failed: {e}")
+        logging.info("Email notification sent successfully")
+    except smtplib.SMTPException as e:
+        logging.error(f"Email sending failed: {str(e)}")
         raise
 
 def main():
     driver = None
     try:
-        driver = initialize_browser()
-        if not access_url_with_retry(driver, SAP_URL):
-            raise Exception("Failed to access SAP URL after multiple attempts.")
+        driver = initialize_driver()
+        logging.info(f"Accessing SAP portal: {SAP_URL}")
+        driver.get(SAP_URL)
         
-        perform_login(driver)
+        handle_login(driver)
         
-        # Capture a screenshot after login
-        screenshot_path = "screenshot.png"
-        time.sleep(5)  # Allow dynamic content to load
+        # Capture screenshot
+        time.sleep(5)  # Allow page stabilization
+        screenshot_path = "sap_report.png"
         driver.save_screenshot(screenshot_path)
-        logging.info("Screenshot captured.")
+        logging.info(f"Screenshot saved to {screenshot_path}")
         
-        send_email_with_screenshot(screenshot_path)
+        send_email_notification(screenshot_path)
+        
     except Exception as e:
-        logging.error(f"Main execution failed: {e}")
+        logging.error(f"Automation failed: {str(e)}", exc_info=True)
+        if driver:
+            driver.save_screenshot("error_screenshot.png")
         raise
     finally:
         if driver:
             driver.quit()
-            logging.info("Browser terminated.")
+            logging.info("Browser session terminated")
 
 if __name__ == "__main__":
     main()
