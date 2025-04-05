@@ -252,10 +252,24 @@ def get_chrome_version():
         logging.error(f"Error getting Chrome version: {e}")
         return None
 
+def kill_chrome_processes():
+    """Kills any existing Chrome/Chromium processes."""
+    try:
+        # Use 'pkill' which is more reliable across different Linux distributions
+        subprocess.run(["pkill", "-f", "chrome"], check=False, capture_output=True)
+        subprocess.run(["pkill", "-f", "chromium"], check=False, capture_output=True)
+        logging.info("Killed any existing Chrome/Chromium processes.")
+    except Exception as e:
+        logging.error(f"Error killing Chrome processes: {e}")
+        # Continue even if killing processes fails
+
 def main():
     driver = None
     unique_dir = None
     try:
+        # Kill any existing Chrome processes before starting
+        kill_chrome_processes()
+
         chrome_version = get_chrome_version()
         if chrome_version:
             logging.info(f"Detected Chrome version: {chrome_version}")
