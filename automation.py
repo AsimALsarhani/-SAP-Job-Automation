@@ -7,6 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse
+import shutil # Import the shutil module
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -73,9 +74,9 @@ def initialize_browser():
     # Additional options for CI/container environments
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--ignore-certificate-errors")  # Add this line
-    options.add_argument("--disable-gpu")  # Add this line
-    options.add_argument("--log-level=3") #suppress webdriver logs
+    options.add_argument("--ignore-certificate-errors")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--log-level=3")
 
     # Generate a unique user data directory using a UUID.
     unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
@@ -182,7 +183,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                     EC.presence_of_element_located((By.ID, "error-message")),
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".error")),
                     EC.title_contains("Error"),
-                    EC.url_changes(base_url) #check if URL changes
+                    EC.url_changes(base_url)
                 )
             )
 
@@ -240,8 +241,10 @@ def perform_login(driver, max_retries=3, retry_delay=5):
 
 def main():
     driver = None
+    unique_dir = None # define unique_dir here
     try:
         driver = initialize_browser()
+        unique_dir = driver.options.arguments[0].split("=")[1] #get the user data dir
         perform_login(driver)
         # Add further actions after successful login if needed.
         logging.info("Proceeding with post-login automation tasks...")
@@ -257,6 +260,10 @@ def main():
         if driver:
             driver.quit()
         logging.info("Driver closed. Automation job completed.")
+        if unique_dir and os.path.exists(unique_dir): # added to remove the dir
+            shutil.rmtree(unique_dir)
+            logging.info(f"Deleted user data directory: {unique_dir}")
+
 
 
 if __name__ == "__main__":
