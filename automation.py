@@ -3,6 +3,9 @@ import os
 import time
 import logging
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -26,6 +29,7 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
+EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true" #Added
 
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set.")
@@ -39,6 +43,52 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+def send_email_report(subject, body, sender_email, sender_password, recipient_email):
+    """Sends an email report."""
+    if not EMAIL_REPORT:
+        logging.info("Email reporting is disabled.")
+        return
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        logging.info("Email report sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send email report: {e}")
+
+def initialize_browser():
+    """Initializes the Chrome WebDriver using webdriver_manager with a unique user data directory."""
+    options = webdriver.ChromeOptions()
+    options.add_argument("--start-maximized")
+    # Additional options for CI/container environments
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--ignore-certificate-errors")  # Add this line
+    options.add_argument("--disable-gpu")  # Add this line
+
+    # Generate a unique user data directory using a UUID.
+    unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
+    options.add_argument(f"--user-data-dir={unique_dir}")
+    logging.info(f"Using unique Chrome user data directory: {unique_dir}")
+
+    # Uncomment the following line if you want to run in headless mode:
+    # options.add_argument("--headless")
+
+    driver = webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()),
+        options=options
+    )
+    return driver
+
 
 def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling, retries, and enhanced logging."""
@@ -134,11 +184,17 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             if "error" in driver.page_source.lower() or "failed" in driver.page_source.lower():
                 logging.error("Login failed: Error message found on page.")
                 driver.save_screenshot("login_error_page.png")
+                send_email_report("SAP Automation - Login Failed",
+                                  "Login failed due to an error message on the page.  See attached screenshot.",
+                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise WebDriverException("Login failed due to error message on page.")
 
             if "Sign In" in driver.title:
                 logging.error("Login failed: Still on the Sign In page.")
                 driver.save_screenshot("login_error_signin_page.png")
+                send_email_report("SAP Automation - Login Failed",
+                                  "Login failed: Still on the Sign In page after login attempt.",
+                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise WebDriverException("Login failed: Still on the Sign In page after login attempt.")
 
             logging.info("Login successful.")
@@ -156,6 +212,9 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 time.sleep(retry_delay)
                 driver.refresh()
             else:
+                send_email_report("SAP Automation - Login Failed",
+                                  f"Login failed after {max_retries} attempts.  Error: {str(e)}",
+                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise
         except NoSuchFrameException as e:
             logging.error(f"NoSuchFrameException: {e}")
@@ -168,46 +227,31 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 time.sleep(retry_delay)
                 driver.refresh()
             else:
+                send_email_report("SAP Automation - Frame Error",
+                              f"Encountered a frame error after {max_retries} attempts. Error: {str(e)}",
+                              SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise
-
-def initialize_driver():
-    """Initializes the Chrome WebDriver using webdriver_manager with a unique user data directory."""
-    options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    # Additional options for CI/container environments
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    
-    # Generate a unique user data directory using a UUID.
-    unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
-    options.add_argument(f"--user-data-dir={unique_dir}")
-    logging.info(f"Using unique Chrome user data directory: {unique_dir}")
-
-    # Uncomment the following line if you want to run in headless mode:
-    # options.add_argument("--headless")
-    
-    driver = webdriver.Chrome(
-        service=ChromeService(ChromeDriverManager().install()),
-        options=options
-    )
-    return driver
 
 def main():
     driver = None
     try:
-        driver = initialize_driver()
+        driver = initialize_browser()
         perform_login(driver)
         # Add further actions after successful login if needed.
         logging.info("Proceeding with post-login automation tasks...")
         # Example: navigate to a specific page, extract data, etc.
         # driver.get("https://sap.example.com/some_page")
         time.sleep(5)  # Pause for demonstration; replace with actual tasks.
+        send_email_report("SAP Automation - Success", "SAP automation script completed successfully.", SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+
     except Exception as ex:
         logging.error(f"Automation job failed: {ex}")
+        send_email_report("SAP Automation - Job Failed", f"SAP automation script failed. Error: {str(ex)}", SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
     finally:
         if driver:
             driver.quit()
         logging.info("Driver closed. Automation job completed.")
+
 
 if __name__ == "__main__":
     main()
