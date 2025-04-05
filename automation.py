@@ -7,7 +7,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse
-import shutil # Import the shutil module
+import shutil
+import subprocess  # Import subprocess
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -31,7 +32,7 @@ SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
-EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true" #Added
+EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true"
 
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set.")
@@ -239,12 +240,30 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                               SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise
 
+def get_chrome_version():
+    """Gets the Chrome version."""
+    try:
+        result = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True, check=True)
+        version_string = result.stdout.strip()
+        # Extract the numeric version
+        version_number = version_string.split("Chrome ")[1].split(".")[0]
+        return version_number
+    except Exception as e:
+        logging.error(f"Error getting Chrome version: {e}")
+        return None
+
 def main():
     driver = None
-    unique_dir = None # define unique_dir here
+    unique_dir = None
     try:
+        chrome_version = get_chrome_version()
+        if chrome_version:
+            logging.info(f"Detected Chrome version: {chrome_version}")
+        else:
+            logging.warning("Could not detect Chrome version.  Using default driver behavior.")
+
         driver = initialize_browser()
-        unique_dir = driver.options.arguments[0].split("=")[1] #get the user data dir
+        unique_dir = driver.options.arguments[0].split("=")[1]
         perform_login(driver)
         # Add further actions after successful login if needed.
         logging.info("Proceeding with post-login automation tasks...")
@@ -260,11 +279,9 @@ def main():
         if driver:
             driver.quit()
         logging.info("Driver closed. Automation job completed.")
-        if unique_dir and os.path.exists(unique_dir): # added to remove the dir
+        if unique_dir and os.path.exists(unique_dir):
             shutil.rmtree(unique_dir)
             logging.info(f"Deleted user data directory: {unique_dir}")
-
-
 
 if __name__ == "__main__":
     main()
