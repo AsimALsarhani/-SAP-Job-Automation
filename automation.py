@@ -2,7 +2,7 @@
 import os
 import time
 import logging
-import tempfile
+import uuid
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -173,12 +173,16 @@ def perform_login(driver, max_retries=3, retry_delay=5):
 def initialize_driver():
     """Initializes the Chrome WebDriver using webdriver_manager with a unique user data directory."""
     options = webdriver.ChromeOptions()
-    # Add any options required for your environment (e.g., headless)
     options.add_argument("--start-maximized")
-    # Generate a unique temporary directory for Chrome user data to avoid conflicts.
-    user_data_dir = tempfile.mkdtemp(prefix="chrome_userdata_")
-    options.add_argument(f"--user-data-dir={user_data_dir}")
-    logging.info(f"Using unique Chrome user data directory: {user_data_dir}")
+    # Additional options for CI/container environments
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    
+    # Generate a unique user data directory using a UUID.
+    unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
+    options.add_argument(f"--user-data-dir={unique_dir}")
+    logging.info(f"Using unique Chrome user data directory: {unique_dir}")
+
     # Uncomment the following line if you want to run in headless mode:
     # options.add_argument("--headless")
     
