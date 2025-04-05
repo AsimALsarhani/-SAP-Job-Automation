@@ -21,7 +21,7 @@ from selenium.common.exceptions import (
     ElementNotInteractableException,
     StaleElementReferenceException,
     WebDriverException,
-    NoSuchFrameException
+    NoSuchFrameException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -44,9 +44,10 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("automation.log"),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
+
 
 def send_email_report(subject, body, sender_email, sender_password, recipient_email):
     """
@@ -57,24 +58,30 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
         return
 
     msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = recipient_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
 
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
         logging.info("Email report sent successfully.")
+    except smtplib.SMTPException as e:
+        logging.error(f"SMTP error occurred while sending email: {e}")
+        raise
     except Exception as e:
         logging.error(f"An unexpected error occurred while sending email: {e}")
         raise
 
+
+
 def initialize_browser():
     """
-    Initializes the Chrome WebDriver with specified options, including a unique user data directory.
+    Initializes the Chrome WebDriver with specified options,
+    including a unique user data directory.
     Instead of /tmp, a directory under HOME is used.
     """
     options = webdriver.ChromeOptions()
@@ -86,6 +93,7 @@ def initialize_browser():
     if HEADLESS_MODE:
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
+
     # Create a unique user data directory inside the user's home folder
     home = os.environ.get("HOME")
     unique_dir = os.path.join(home, f"chrome_userdata_{uuid.uuid4()}")
@@ -99,13 +107,16 @@ def initialize_browser():
         options.binary_location = chrome_executable_path
         logging.info(f"Using Chrome binary at: {chrome_executable_path}")
     else:
-        logging.warning("Chrome binary not found at default path. webdriver_manager will attempt to locate it.")
+        logging.warning(
+            "Chrome binary not found at default path. webdriver_manager will attempt to locate it."
+        )
 
     driver = webdriver.Chrome(
-        service=ChromeService(ChromeDriverManager().install()),
-        options=options
+        service=ChromeService(ChromeDriverManager().install()), options=options
     )
     return driver, unique_dir
+
+
 
 def kill_chrome_processes():
     """Kills any existing Chrome/Chromium processes."""
@@ -116,17 +127,20 @@ def kill_chrome_processes():
     except Exception as e:
         logging.error(f"Error killing Chrome processes: {e}")
 
+
+
 def remove_lock_files(user_data_dir):
     """Removes lock files from the Chrome user data directory."""
     lock_files = [
         "lockfile",
         "SingletonLock",
         "SingletonSocket",
-        "SingletonCookie"
+        "SingletonCookie",
     ]
     if not os.path.exists(user_data_dir):
         logging.warning(f"User data directory does not exist: {user_data_dir}")
         return
+
     for filename in lock_files:
         lock_file_path = os.path.join(user_data_dir, filename)
         if os.path.exists(lock_file_path):
@@ -136,17 +150,22 @@ def remove_lock_files(user_data_dir):
             except Exception as e:
                 logging.error(f"Error removing lock file {lock_file_path}: {e}")
 
+
+
 def check_permissions(user_data_dir):
     """Checks permissions of the user data directory."""
     if not os.path.exists(user_data_dir):
         logging.warning(f"User data directory does not exist: {user_data_dir}")
         return
+
     try:
         st = os.stat(user_data_dir)
         uid = st.st_uid
         gid = st.st_gid
         mode = oct(st.st_mode & 0o777)
-        logging.info(f"User data directory permissions: Owner={uid}, Group={gid}, Mode={mode}, Path={user_data_dir}")
+        logging.info(
+            f"User data directory permissions: Owner={uid}, Group={gid}, Mode={mode}, Path={user_data_dir}"
+        )
         if os.access(user_data_dir, os.W_OK):
             logging.info(f"User data directory is writable: {user_data_dir}")
         else:
@@ -154,16 +173,25 @@ def check_permissions(user_data_dir):
     except Exception as e:
         logging.error(f"Error checking permissions of {user_data_dir}: {e}")
 
+
+
 def perform_login(driver, max_retries=3, retry_delay=5):
-    """Performs the login sequence to the SAP application."""
+    """
+    Performs the login sequence to the SAP application.
+    """
+
     def locate_and_fill_element(by, value, keys):
         try:
-            element = WebDriverWait(driver, 120).until(EC.presence_of_element_located((by, value)))
+            element = WebDriverWait(driver, 120).until(
+                EC.presence_of_element_located((by, value))
+            )
             element.clear()
             element.send_keys(keys)
             return element
-        except Exception as e:
-            raise WebDriverException(f"Failed to locate or interact with element {by}={value}: {e}")
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
+            raise WebDriverException(
+                f"Failed to locate or interact with element {by}={value}: {e}"
+            )
 
     parsed_url = urlparse(SAP_URL)
     base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
@@ -173,12 +201,16 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
             driver.get(SAP_URL)
             try:
-                WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID")))
+                WebDriverWait(driver, 10).until(
+                    EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
+                )
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
 
-            WebDriverWait(driver, 120).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            WebDriverWait(driver, 120).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
             time.sleep(1)
 
             locate_and_fill_element(By.ID, "username", SAP_USERNAME)
@@ -186,12 +218,16 @@ def perform_login(driver, max_retries=3, retry_delay=5):
 
             sign_in_button = None
             try:
-                sign_in_button = WebDriverWait(driver, 60).until(EC.element_to_be_clickable((By.ID, "signIn")))
+                sign_in_button = WebDriverWait(driver, 60).until(
+                    EC.element_to_be_clickable((By.ID, "signIn"))
+                )
                 logging.info("Sign In button found by ID.")
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying alternative locator.")
                 sign_in_button = WebDriverWait(driver, 60).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(text(),'Sign In')]")
+                    )
                 )
                 logging.info("Sign In button found by XPath.")
 
@@ -203,11 +239,13 @@ def perform_login(driver, max_retries=3, retry_delay=5):
 
             WebDriverWait(driver, 120).until(
                 EC.any_of(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content")),
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, ".sap-main-content")
+                    ),
                     EC.presence_of_element_located((By.ID, "error-message")),
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".error")),
                     EC.title_contains("Error"),
-                    EC.url_changes(base_url)
+                    EC.url_changes(base_url),
                 )
             )
 
@@ -216,64 +254,152 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 error_message = "Login failed due to error message on page."
                 logging.error(error_message)
                 driver.save_screenshot("login_error_page.png")
-                send_email_report("SAP Automation - Login Failed",
-                                  "Login failed due to an error message on the page.",
-                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+                send_email_report(
+                    "SAP Automation - Login Failed",
+                    "Login failed due to an error message on the page.",
+                    SENDER_EMAIL,
+                    SENDER_PASSWORD,
+                    RECIPIENT_EMAIL,
+                )
                 raise WebDriverException(error_message)
 
             if "Sign In" in driver.title:
                 error_message = "Login failed: Still on the Sign In page."
                 logging.error(error_message)
                 driver.save_screenshot("login_error_signin_page.png")
-                send_email_report("SAP Automation - Login Failed",
-                                  "Login failed: Still on the Sign In page after login attempt.",
-                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+                send_email_report(
+                    "SAP Automation - Login Failed",
+                    "Login failed: Still on the Sign In page after login attempt.",
+                    SENDER_EMAIL,
+                    SENDER_PASSWORD,
+                    RECIPIENT_EMAIL,
+                )
                 raise WebDriverException(error_message)
 
             logging.info("Login successful.")
             return
 
-        except Exception as e:
+        except (
+            TimeoutException,
+            NoSuchElementException,
+            ElementNotInteractableException,
+            StaleElementReferenceException,
+            WebDriverException,
+        ) as e:
             logging.error(f"Login failure: {str(e)}")
             screenshot_name = f"login_failure_attempt_{attempt + 1}.png"
             driver.save_screenshot(screenshot_name)
             logging.error(f"Screenshot saved as {screenshot_name}")
-            logging.error(f"Page source at error (first 1000 chars): {driver.page_source[:1000]}")
+            logging.error(
+                f"Page source at error (first 1000 chars): {driver.page_source[:1000]}"
+            )
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
                 time.sleep(retry_delay)
                 driver.refresh()
             else:
-                send_email_report("SAP Automation - Login Failed",
-                                  f"Login failed after {max_retries} attempts. Error: {str(e)}",
-                                  SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+                send_email_report(
+                    "SAP Automation - Login Failed",
+                    f"Login failed after {max_retries} attempts. Error: {str(e)}",
+                    SENDER_EMAIL,
+                    SENDER_PASSWORD,
+                    RECIPIENT_EMAIL,
+                )
                 raise
+        except NoSuchFrameException as e:
+            logging.error(f"NoSuchFrameException: {e}")
+            screenshot_name = f"frame_exception_{attempt + 1}.png"
+            driver.save_screenshot(screenshot_name)
+            logging.error(f"Screenshot saved as {screenshot_name}")
+            logging.error(
+                f"Page source at error (first 1000 chars): {driver.page_source[:1000]}"
+            )
+            if attempt < max_retries - 1:
+                logging.info(f"Retrying login in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                driver.refresh()
+            else:
+                send_email_report(
+                    "SAP Automation - Frame Error",
+                    f"Encountered a frame error after {max_retries} attempts. Error: {str(e)}",
+                    SENDER_EMAIL,
+                    SENDER_PASSWORD,
+                    RECIPIENT_EMAIL,
+                )
+                raise
+
+
+def get_chrome_version():
+    """Gets the Chrome version."""
+    try:
+        result = subprocess.run(
+            ["google-chrome", "--version"], capture_output=True, text=True, check=True
+        )
+        version_string = result.stdout.strip()
+        version_number = version_string.split("Chrome ")[1].split(".")[0]
+        return version_number
+    except Exception as e:
+        logging.error(f"Error getting Chrome version: {e}")
+        return None
+
+
 
 def main():
     driver = None
     driver_user_data_dir = None
     try:
+        # Kill any existing Chrome processes
         kill_chrome_processes()
+
+        chrome_version = get_chrome_version()
+        if chrome_version:
+            logging.info(f"Detected Chrome version: {chrome_version}")
+        else:
+            logging.warning(
+                "Could not detect Chrome version. Using default driver behavior."
+            )
+
+        # Create a unique directory (for cleanup purposes)
+        home = os.environ.get("HOME")  # Get the user's home directory
+        unique_dir = os.path.join(
+            home, f"chrome_userdata_{uuid.uuid4()}"
+        )  # Use a subfolder in home
+        os.makedirs(unique_dir, exist_ok=True)  # create the directory
+        remove_lock_files(unique_dir)
+        check_permissions(unique_dir)
+
         time.sleep(5)
         driver, driver_user_data_dir = initialize_browser()
+        # Note: driver_user_data_dir is the unique directory used by the browser.
         perform_login(driver)
+
         logging.info("Proceeding with post-login automation tasks...")
         time.sleep(5)
-        send_email_report("SAP Automation - Success",
-                          "SAP automation script completed successfully.",
-                          SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+        send_email_report(
+            "SAP Automation - Success",
+            "SAP automation script completed successfully.",
+            SENDER_EMAIL,
+            SENDER_PASSWORD,
+            RECIPIENT_EMAIL,
+        )
     except Exception as ex:
         logging.error(f"Automation job failed: {ex}")
-        send_email_report("SAP Automation - Job Failed",
-                          f"SAP automation script failed. Error: {str(ex)}",
-                          SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
+        send_email_report(
+            "SAP Automation - Job Failed",
+            f"SAP automation script failed. Error: {str(ex)}",
+            SENDER_EMAIL,
+            SENDER_PASSWORD,
+            RECIPIENT_EMAIL,
+        )
     finally:
         if driver:
             driver.quit()
         logging.info("Driver closed. Automation job completed.")
-        if driver_user_data_dir and os.path.exists(driver_user_data_dir):
+        # Clean up the unique user data directory used by the driver.
+        if driver and driver_user_data_dir and os.path.exists(driver_user_data_dir):
             shutil.rmtree(driver_user_data_dir)
             logging.info(f"Deleted driver user data directory: {driver_user_data_dir}")
+
 
 if __name__ == "__main__":
     main()
