@@ -7,6 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse
+import subprocess  # Import subprocess
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
