@@ -4,8 +4,6 @@ import time
 import logging
 import uuid
 import smtplib
-import shutil
-import subprocess
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse
@@ -23,7 +21,7 @@ from selenium.common.exceptions import (
     WebDriverException,
     NoSuchFrameException,
 )
-from webdriver_manager.chrome import ChromeDriverManager
+#from webdriver_manager.chrome import ChromeDriverManager # Not used with Docker
 
 # Environment Configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "asim.s.alsarhani@gmail.com")
@@ -42,10 +40,7 @@ if not SAP_URL:
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("automation.log"),
-        logging.StreamHandler(),
-    ],
+    handlers=[logging.StreamHandler()],  # Log to stdout in Docker
 )
 
 
@@ -57,7 +52,7 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
         subject (str): The subject of the email.
         body (str): The body of the email.
         sender_email (str): The sender's email address.
-        sender_password (str): The sender's email password.  **Sensitive information, handle with care.**
+        sender_password (str): The sender's email password. **Sensitive information.**
         recipient_email (str): The recipient's email address.
 
     Raises:
@@ -93,7 +88,6 @@ def initialize_browser():
     """
     Initializes the Chrome WebDriver with specified options,
     including a unique user data directory.
-    Instead of /tmp, a directory under HOME is used.
     """
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -105,26 +99,15 @@ def initialize_browser():
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
 
-    # Create a unique user data directory inside the user's home folder
-    home = os.environ.get("HOME")
-    unique_dir = os.path.join(home, f"chrome_userdata_{uuid.uuid4()}")
+    # Create a unique user data directory
+    unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
     os.makedirs(unique_dir, exist_ok=True)
     options.add_argument(f"--user-data-dir={unique_dir}")
     logging.info(f"Using unique Chrome user data directory: {unique_dir}")
 
-    # Specify Chrome binary location if needed
-    chrome_executable_path = "/usr/bin/google-chrome"
-    if os.path.exists(chrome_executable_path):
-        options.binary_location = chrome_executable_path
-        logging.info(f"Using Chrome binary at: {chrome_executable_path}")
-    else:
-        logging.warning(
-            "Chrome binary not found at default path. webdriver_manager will attempt to locate it."
-        )
-
-    driver = webdriver.Chrome(
-        service=ChromeService(ChromeDriverManager().install()), options=options
-    )
+    # Use the Chrome and ChromeDriver from the container
+    chrome_service = ChromeService(executable_path=CHROMEDRIVER_PATH)
+    driver = webdriver.Chrome(service=chrome_service, options=options)
     return driver, unique_dir
 
 
@@ -369,7 +352,7 @@ def get_chrome_version():
             ["google-chrome", "--version"], capture_output=True, text=True, check=True
         )
         version_string = result.stdout.strip()
-        version_number = version_string.split("Chrome ")[1].split(".")[0]
+        version_number = result.stdout.split("Chrome ")[1].split(".")[0]
         return version_number
     except Exception as e:
         logging.error(f"Error getting Chrome version: {e}")
@@ -392,18 +375,7 @@ def main():
                 "Could not detect Chrome version. Using default driver behavior."
             )
 
-        # Create a unique directory (for cleanup purposes)
-        home = os.environ.get("HOME")  # Get the user's home directory
-        unique_dir = os.path.join(
-            home, f"chrome_userdata_{uuid.uuid4()}"
-        )  # Use a subfolder in home
-        os.makedirs(unique_dir, exist_ok=True)  # create the directory
-        remove_lock_files(unique_dir)
-        check_permissions(unique_dir)
-
-        time.sleep(5)
         driver, driver_user_data_dir = initialize_browser()
-        # Note: driver_user_data_dir is the unique directory used by the browser.
         perform_login(driver)
 
         logging.info("Proceeding with post-login automation tasks...")
@@ -429,11 +401,11 @@ def main():
             driver.quit()
         logging.info("Driver closed. Automation job completed.")
         # Clean up the unique user data directory used by the driver.
-        if driver and driver_user_data_dir and os.path.exists(driver_user_data_dir):
+        if driver_user_data_dir and os.path.exists(driver_user_data_dir):
             shutil.rmtree(driver_user_data_dir)
             logging.info(f"Deleted driver user data directory: {driver_user_data_dir}")
 
 
+
 if __name__ == "__main__":
     main()
-
