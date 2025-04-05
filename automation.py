@@ -6,8 +6,10 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from urllib.parse import urlparse
 import subprocess  # Import subprocess
+import shutil  # Import the shutil module
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -22,7 +24,8 @@ from selenium.common.exceptions import (
     WebDriverException,
     NoSuchFrameException,
 )
-#from webdriver_manager.chrome import ChromeDriverManager # Not used with Docker
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 # Environment Configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME", "asim.s.alsarhani@gmail.com")
@@ -30,7 +33,7 @@ SAP_PASSWORD = os.environ.get("SAP_PASSWORD", "AbuSY@1990")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
-SAP_URL = os.environ.get("SAP_URL")  # Mandatory
+SAP_URL = os.environ.get("SAP_URL", "https://career23.sapsf.com/portalcareer?company=saudiara05&rcm%5fsite%5flocale=en%5fUS&&navBarLevel=MY_PROFILE&_s.crb=G6m7RtwTu3ML9073ujGOG%252bYc58m6hAuHTwz4fy1aNnw%253d")  # Mandatory
 EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true"
 HEADLESS_MODE = os.environ.get("HEADLESS_MODE", "True").lower() == "true"
 
@@ -45,7 +48,7 @@ logging.basicConfig(
 )
 
 
-def send_email_report(subject, body, sender_email, sender_password, recipient_email):
+def send_email_report(subject, body, sender_email, sender_password, recipient_email, screenshot_path=None):
     """
     Sends an email report.
 
@@ -55,6 +58,7 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
         sender_email (str): The sender's email address.
         sender_password (str): The sender's email password. **Sensitive information.**
         recipient_email (str): The recipient's email address.
+        screenshot_path (str, optional): Path to a screenshot to attach. Defaults to None.
 
     Raises:
         smtplib.SMTPException: If an error occurs during the SMTP process.
@@ -69,6 +73,14 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
     msg["To"] = recipient_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
+
+    if screenshot_path:
+        try:
+            with open(screenshot_path, "rb") as img_file:
+                img = MIMEImage(img_file.read(), name=os.path.basename(screenshot_path))
+                msg.attach(img)
+        except Exception as e:
+            logging.error(f"Error attaching screenshot: {e}")
 
     try:
         server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
@@ -106,8 +118,8 @@ def initialize_browser():
     options.add_argument(f"--user-data-dir={unique_dir}")
     logging.info(f"Using unique Chrome user data directory: {unique_dir}")
 
-    # Use the Chrome and ChromeDriver from the container
-    chrome_service = ChromeService(executable_path=CHROMEDRIVER_PATH)
+    # Use the Chrome and ChromeDriver from the system
+    chrome_service = ChromeService()
     driver = webdriver.Chrome(service=chrome_service, options=options)
     return driver, unique_dir
 
@@ -380,14 +392,68 @@ def main():
         perform_login(driver)
 
         logging.info("Proceeding with post-login automation tasks...")
-        time.sleep(5)
+
+        # 1. Click "Save" Button
+        save_button = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.ACCESSIBILITY_LABEL, "Save"))
+        )
+        save_button.click()
+        logging.info("Clicked 'Save' button.")
+
+        # 2. Click "Careers Site"
+        careers_site_link = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.ACCESSIBILITY_LABEL, "Careers Site"))
+        )
+        careers_site_link.click()
+        logging.info("Clicked 'Careers Site' link.")
+
+        # 3. Multiple Clicks on #rcmCandidateProfileCtr (Simplified to one click)
+        profile_section = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "#rcmCandidateProfileCtr"))
+        )
+        profile_section.click()
+        logging.info("Clicked on #rcmCandidateProfileCtr")
+
+        # 4. 50-second wait
+        time.sleep(50)
+        logging.info("Waited for 50 seconds.")
+
+        # 5. Reload the page
+        driver.refresh()
+        logging.info("Reloaded the page.")
+
+        # 6. Scroll up
+        driver.execute_script("window.scrollTo(0, 0);")
+        logging.info("Scrolled to the top of the page.")
+
+        # 7. Find the latest update notification (This is highly dependent on the page structure)
+        #    You'll need to replace this with the correct selector.  This is just an example.
+        try:
+            update_notification = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".latest-update-notification"))
+            )
+            logging.info("Found latest update notification.")
+            # 8. Click on the notification
+            update_notification.click()
+            logging.info("Clicked on the latest update notification")
+        except TimeoutException:
+            logging.warning("Could not find the latest update notification.")
+
+        # 9. Take a screenshot
+        screenshot_path = "update_notification.png"
+        driver.save_screenshot(screenshot_path)
+        logging.info(f"Saved screenshot: {screenshot_path}")
+
+        # 10.  Send Email Report
         send_email_report(
             "SAP Automation - Success",
-            "SAP automation script completed successfully.",
+            "SAP automation script completed successfully.  Screenshot of update notification attached.",
             SENDER_EMAIL,
             SENDER_PASSWORD,
             RECIPIENT_EMAIL,
+            screenshot_path
         )
+
     except Exception as ex:
         logging.error(f"Automation job failed: {ex}")
         send_email_report(
