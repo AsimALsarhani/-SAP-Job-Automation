@@ -21,7 +21,8 @@ from selenium.common.exceptions import (
     ElementNotInteractableException,
     StaleElementReferenceException,
     WebDriverException,
-    NoSuchFrameException
+    NoSuchFrameException,
+    SMTPException #Import the new Exception
 )
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -35,6 +36,7 @@ SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true"
 HEADLESS_MODE = os.environ.get("HEADLESS_MODE", "True").lower() == "true" # added
 
+# Validate that mandatory environment variables are set.
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set.")
 
@@ -49,7 +51,19 @@ logging.basicConfig(
 )
 
 def send_email_report(subject, body, sender_email, sender_password, recipient_email):
-    """Sends an email report."""
+    """
+    Sends an email report.
+
+    Args:
+        subject (str): The subject of the email.
+        body (str): The body of the email.
+        sender_email (str): The sender's email address.
+        sender_password (str): The sender's email password.  This is marked as a sensitive value and is not logged.
+        recipient_email (str): The recipient's email address.
+
+    Returns:
+        None
+    """
     if not EMAIL_REPORT:
         logging.info("Email reporting is disabled.")
         return
@@ -66,32 +80,42 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
         server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
         logging.info("Email report sent successfully.")
+    except SMTPException as e:
+        logging.error(f"SMTP error occurred while sending email: {e}")
+        raise  # Re-raise the exception so that the calling function can handle it
     except Exception as e:
-        logging.error(f"Failed to send email report: {e}")
+        logging.error(f"An unexpected error occurred while sending email: {e}")
+        raise  # Re-raise the exception
 
 
 
 def initialize_browser():
-    """Initializes the Chrome WebDriver using webdriver_manager with a unique user data directory."""
+    """
+    Initializes the Chrome WebDriver with specified options, including a unique user data directory.
+
+    Returns:
+        selenium.webdriver.Chrome: The initialized Chrome WebDriver instance.
+    """
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     # Additional options for CI/container environments
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--ignore-certificate-errors")
-    options.add_argument("--disable-gpu")
     options.add_argument("--log-level=3")
+
+    if HEADLESS_MODE:
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")  # Consider adding this for headless
+        options.add_argument("--disable-software-rasterizer")
+        logging.info("Running in headless mode")
+    else:
+        logging.info("Running in non-headless mode")
 
     # Generate a unique user data directory using a UUID.
     unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
     options.add_argument(f"--user-data-dir={unique_dir}")
     logging.info(f"Using unique Chrome user data directory: {unique_dir}")
-
-    if HEADLESS_MODE: # use the variable
-        options.add_argument("--headless")
-        logging.info("Running in headless mode")
-    else:
-        logging.info("Running in non-headless mode")
 
     # Specify Chrome binary path (optional, may need adjustment)
     chrome_executable_path = "/usr/bin/google-chrome"  # Or /usr/bin/chromium-browser
@@ -110,7 +134,44 @@ def initialize_browser():
 
 
 def perform_login(driver, max_retries=3, retry_delay=5):
-    """Execute login with robust error handling, retries, and enhanced logging."""
+    """
+    Performs the login sequence to the SAP application.
+
+    Args:
+        driver (selenium.webdriver.Chrome): The Chrome WebDriver instance.
+        max_retries (int, optional): Maximum number of login attempts. Defaults to 3.
+        retry_delay (int, optional): Delay in seconds between retries. Defaults to 5.
+
+    Returns:
+        None
+
+    Raises:
+        WebDriverException: If login fails after maximum retries or due to specific errors.
+    """
+    def locate_and_fill_element(by, value, keys):
+        """
+        Locates an element and fills it with the provided keys.
+
+        Args:
+            by (selenium.webdriver.common.by.By): The locator type (e.g., By.ID, By.XPATH).
+            value (str): The locator value.
+            keys (str): The keys to send to the element.
+
+        Returns:
+            selenium.webdriver.remote.webelement.WebElement: The located element.
+
+        Raises:
+            WebDriverException: If the element is not found or intractable.
+        """
+        try:
+            element = WebDriverWait(driver, 120).until(EC.presence_of_element_located((by, value)))
+            element.clear()
+            element.send_keys(keys)
+            return element
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
+            raise WebDriverException(f"Failed to locate or interact with element {by}={value}: {e}")
+
+
     parsed_url = urlparse(SAP_URL)
     base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
@@ -118,47 +179,21 @@ def perform_login(driver, max_retries=3, retry_delay=5):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
             driver.get(SAP_URL)
-
-            # Attempt to switch to a frame if required.
             try:
-                WebDriverWait(driver, 10).until(
-                    EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
-                )
+                WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID")))
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
 
-            # Ensure the page body is loaded.
-            WebDriverWait(driver, 120).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            time.sleep(1)  # Allow extra time for dynamic content
+            WebDriverWait(driver, 120).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            time.sleep(1)
 
-            # Locate username field and enter username
-            logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 120).until(
-                EC.presence_of_element_located((By.ID, "username"))
-            )
-            logging.info("Username field found. Sending keys.")
-            username_field.clear()
-            username_field.send_keys(SAP_USERNAME)
+            locate_and_fill_element(By.ID, "username", SAP_USERNAME)
+            locate_and_fill_element(By.ID, "password", SAP_PASSWORD)
 
-            # Locate password field and enter password
-            logging.info("Waiting for password field...")
-            password_field = WebDriverWait(driver, 120).until(
-                EC.presence_of_element_located((By.ID, "password"))
-            )
-            logging.info("Password field found. Sending keys.")
-            password_field.clear()
-            password_field.send_keys(SAP_PASSWORD)
-
-            # Locate and click the Sign In button using multiple locators.
-            logging.info("Waiting for Sign In button...")
             sign_in_button = None
             try:
-                sign_in_button = WebDriverWait(driver, 60).until(
-                    EC.element_to_be_clickable((By.ID, "signIn"))
-                )
+                sign_in_button = WebDriverWait(driver, 60).until(EC.element_to_be_clickable((By.ID, "signIn")))
                 logging.info("Sign In button found by ID.")
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying XPath.")
@@ -182,17 +217,18 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                             )
                             logging.info("Sign In button found by Name.")
                         except TimeoutException:
-                            logging.error("Sign In button not found using any locator.")
-                            raise NoSuchElementException("Failed to locate Sign In button using any locator.")
+                            error_message = "Sign In button not found using any locator."
+                            logging.error(error_message)
+                            raise NoSuchElementException(error_message)
 
             if sign_in_button:
                 logging.info("Clicking the Sign In button.")
                 driver.execute_script("arguments[0].click();", sign_in_button)
             else:
-                raise NoSuchElementException("Sign In button not located.")
+                error_message = "Sign In button not located."
+                logging.error(error_message)
+                raise NoSuchElementException(error_message)
 
-            # Post-login verification
-            logging.info("Waiting for post-login verification...")
             WebDriverWait(driver, 120).until(
                 EC.any_of(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content")),
@@ -202,23 +238,24 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                     EC.url_changes(base_url)
                 )
             )
-
-            # Check for error indicators on the page.
-            if "error" in driver.page_source.lower() or "failed" in driver.page_source.lower():
-                logging.error("Login failed: Error message found on page.")
+            page_source_lower = driver.page_source.lower()
+            if "error" in page_source_lower or "failed" in page_source_lower:
+                error_message = "Login failed due to error message on page."
+                logging.error(error_message)
                 driver.save_screenshot("login_error_page.png")
                 send_email_report("SAP Automation - Login Failed",
                                   "Login failed due to an error message on the page.  See attached screenshot.",
                                   SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
-                raise WebDriverException("Login failed due to error message on page.")
+                raise WebDriverException(error_message)
 
             if "Sign In" in driver.title:
-                logging.error("Login failed: Still on the Sign In page.")
+                error_message = "Login failed: Still on the Sign In page."
+                logging.error(error_message)
                 driver.save_screenshot("login_error_signin_page.png")
                 send_email_report("SAP Automation - Login Failed",
                                   "Login failed: Still on the Sign In page after login attempt.",
                                   SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
-                raise WebDriverException("Login failed: Still on the Sign In page after login attempt.")
+                raise WebDriverException(error_message)
 
             logging.info("Login successful.")
             return  # Exit the function on success
@@ -283,7 +320,11 @@ def kill_chrome_processes():
 
 
 def remove_lock_files(user_data_dir):
-    """Removes lock files from the Chrome user data directory."""
+    """Removes lock files from the Chrome user data directory.
+
+    Args:
+        user_data_dir (str): The path to the Chrome user data directory.
+    """
     lock_files = [
         "lockfile",
         "SingletonLock",
@@ -306,7 +347,11 @@ def remove_lock_files(user_data_dir):
 
 
 def check_permissions(user_data_dir):
-    """Checks permissions of the user data directory."""
+    """Checks permissions of the user data directory.
+
+    Args:
+        user_data_dir (str): The path to the Chrome user data directory.
+    """
     if not os.path.exists(user_data_dir):
         logging.warning(f"User data directory does not exist: {user_data_dir}")
         return
@@ -332,6 +377,9 @@ def check_permissions(user_data_dir):
 
 
 def main():
+    """
+    Main function to execute the SAP automation script.
+    """
     driver = None
     unique_dir = None
     try:
@@ -379,3 +427,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
