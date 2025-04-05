@@ -6,6 +6,7 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from urllib.parse import urlparse
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -74,6 +75,7 @@ def initialize_browser():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--ignore-certificate-errors")  # Add this line
     options.add_argument("--disable-gpu")  # Add this line
+    options.add_argument("--log-level=3") #suppress webdriver logs
 
     # Generate a unique user data directory using a UUID.
     unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
@@ -92,6 +94,9 @@ def initialize_browser():
 
 def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling, retries, and enhanced logging."""
+    parsed_url = urlparse(SAP_URL)
+    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
     for attempt in range(max_retries):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
@@ -177,6 +182,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                     EC.presence_of_element_located((By.ID, "error-message")),
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".error")),
                     EC.title_contains("Error"),
+                    EC.url_changes(base_url) #check if URL changes
                 )
             )
 
