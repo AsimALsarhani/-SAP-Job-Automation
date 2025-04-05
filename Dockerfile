@@ -19,14 +19,22 @@ RUN apt-get update && \
     xdg-utils && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Chrome and ChromeDriver
-RUN curl -Lo /tmp/chrome.zip https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
-    unzip /tmp/chrome.zip -d /tmp/chrome && \
-    dpkg -i /tmp/chrome/google-chrome-stable_current_amd64.deb; \
-    apt-get install -f -y && \
-    rm -rf /tmp/chrome*
+# Install Google Chrome
+RUN curl -Lo /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    dpkg -i /tmp/google-chrome.deb || true && \
+    apt-get update && apt-get install -f -y && \
+    rm /tmp/google-chrome.deb
 
-# Set Chrome binary path
+# Install ChromeDriver matching the installed Chrome version
+RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') && \
+    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}") && \
+    curl -Lo /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
+    unzip /tmp/chromedriver.zip -d /tmp && \
+    mv /tmp/chromedriver /usr/bin/chromedriver && \
+    chmod +x /usr/bin/chromedriver && \
+    rm /tmp/chromedriver.zip
+
+# Set Chrome binary and ChromeDriver paths as environment variables
 ENV CHROME_PATH="/usr/bin/google-chrome"
 ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
 
