@@ -127,7 +127,17 @@ def initialize_browser():
         logging.warning(f"Chrome binary not found at: {chrome_binary_path}.  Ensure Chrome is installed and the path is correct.")
 
     chrome_service = ChromeService()
-    driver = webdriver.Chrome(service=chrome_service, options=options)
+    try:
+        driver = webdriver.Chrome(service=chrome_service, options=options)
+    except WebDriverException as e:
+        logging.error(f"WebDriverException during initialization: {e}")
+        #  attempt to add the executable_path to the ChromeService.
+        chrome_service = ChromeService(executable_path="/usr/bin/chromedriver")  #  correct path if necessary
+        try:
+            driver = webdriver.Chrome(service=chrome_service, options=options)
+        except WebDriverException as e2:
+            logging.error(f"WebDriverException after setting executable_path: {e2}")
+            raise  # Re-raise the exception to be handled in main()
     return driver, unique_dir
 
 
