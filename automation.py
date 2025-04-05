@@ -33,6 +33,7 @@ SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 EMAIL_REPORT = os.environ.get("EMAIL_REPORT", "True").lower() == "true"
+HEADLESS_MODE = os.environ.get("HEADLESS_MODE", "True").lower() == "true" # added
 
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set.")
@@ -68,6 +69,8 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
     except Exception as e:
         logging.error(f"Failed to send email report: {e}")
 
+
+
 def initialize_browser():
     """Initializes the Chrome WebDriver using webdriver_manager with a unique user data directory."""
     options = webdriver.ChromeOptions()
@@ -84,14 +87,26 @@ def initialize_browser():
     options.add_argument(f"--user-data-dir={unique_dir}")
     logging.info(f"Using unique Chrome user data directory: {unique_dir}")
 
-    # Uncomment the following line if you want to run in headless mode:
-    # options.add_argument("--headless")
+    if HEADLESS_MODE: # use the variable
+        options.add_argument("--headless")
+        logging.info("Running in headless mode")
+    else:
+        logging.info("Running in non-headless mode")
+
+    # Specify Chrome binary path (optional, may need adjustment)
+    chrome_executable_path = "/usr/bin/google-chrome"  # Or /usr/bin/chromium-browser
+    if os.path.exists(chrome_executable_path):
+        options.binary_location = chrome_executable_path
+        logging.info(f"Using Chrome binary at: {chrome_executable_path}")
+    else:
+        logging.warning("Chrome binary not found at default path.  webdriver_manager will attempt to locate it.")
 
     driver = webdriver.Chrome(
         service=ChromeService(ChromeDriverManager().install()),
         options=options
     )
     return driver
+
 
 
 def perform_login(driver, max_retries=3, retry_delay=5):
@@ -240,6 +255,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                               SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL)
                 raise
 
+
 def get_chrome_version():
     """Gets the Chrome version."""
     try:
@@ -252,6 +268,8 @@ def get_chrome_version():
         logging.error(f"Error getting Chrome version: {e}")
         return None
 
+
+
 def kill_chrome_processes():
     """Kills any existing Chrome/Chromium processes."""
     try:
@@ -262,6 +280,56 @@ def kill_chrome_processes():
     except Exception as e:
         logging.error(f"Error killing Chrome processes: {e}")
         # Continue even if killing processes fails
+
+
+def remove_lock_files(user_data_dir):
+    """Removes lock files from the Chrome user data directory."""
+    lock_files = [
+        "lockfile",
+        "SingletonLock",
+        "SingletonSocket",
+        "SingletonCookie"
+    ]
+    if not os.path.exists(user_data_dir):
+        logging.warning(f"User data directory does not exist: {user_data_dir}")
+        return  # Exit if the directory doesn't exist
+
+    for filename in lock_files:
+        lock_file_path = os.path.join(user_data_dir, filename)
+        if os.path.exists(lock_file_path):
+            try:
+                os.remove(lock_file_path)
+                logging.info(f"Removed lock file: {lock_file_path}")
+            except Exception as e:
+                logging.error(f"Error removing lock file {lock_file_path}: {e}")
+
+
+
+def check_permissions(user_data_dir):
+    """Checks permissions of the user data directory."""
+    if not os.path.exists(user_data_dir):
+        logging.warning(f"User data directory does not exist: {user_data_dir}")
+        return
+
+    try:
+        # Use stat to get file information
+        st = os.stat(user_data_dir)
+        # Get the owner and group IDs
+        uid = st.st_uid
+        gid = st.st_gid
+        # Get the permissions in octal format
+        mode = oct(st.st_mode & 0o777)
+        logging.info(f"User data directory permissions: Owner={uid}, Group={gid}, Mode={mode}, Path={user_data_dir}")
+
+        # Check if the directory is writable
+        if os.access(user_data_dir, os.W_OK):
+            logging.info(f"User data directory is writable: {user_data_dir}")
+        else:
+            logging.error(f"User data directory is not writable: {user_data_dir}")
+    except Exception as e:
+        logging.error(f"Error checking permissions of {user_data_dir}: {e}")
+
+
 
 def main():
     driver = None
@@ -276,8 +344,18 @@ def main():
         else:
             logging.warning("Could not detect Chrome version.  Using default driver behavior.")
 
+        # Create a unique directory
+        unique_dir = f"/tmp/chrome_userdata_{uuid.uuid4()}"
+
+        # Remove lock files
+        remove_lock_files(unique_dir)
+
+        # Check Permissions
+        check_permissions(unique_dir)
+
+        # Add a delay before initializing the browser
+        time.sleep(5)
         driver = initialize_browser()
-        unique_dir = driver.options.arguments[0].split("=")[1]
         perform_login(driver)
         # Add further actions after successful login if needed.
         logging.info("Proceeding with post-login automation tasks...")
@@ -296,6 +374,8 @@ def main():
         if unique_dir and os.path.exists(unique_dir):
             shutil.rmtree(unique_dir)
             logging.info(f"Deleted user data directory: {unique_dir}")
+
+
 
 if __name__ == "__main__":
     main()
