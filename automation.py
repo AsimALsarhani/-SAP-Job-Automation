@@ -52,6 +52,17 @@ logging.basicConfig(
 def send_email_report(subject, body, sender_email, sender_password, recipient_email):
     """
     Sends an email report.
+
+    Args:
+        subject (str): The subject of the email.
+        body (str): The body of the email.
+        sender_email (str): The sender's email address.
+        sender_password (str): The sender's email password.  **Sensitive information, handle with care.**
+        recipient_email (str): The recipient's email address.
+
+    Raises:
+        smtplib.SMTPException: If an error occurs during the SMTP process.
+        Exception: For other unexpected errors.
     """
     if not EMAIL_REPORT:
         logging.info("Email reporting is disabled.")
@@ -178,9 +189,31 @@ def check_permissions(user_data_dir):
 def perform_login(driver, max_retries=3, retry_delay=5):
     """
     Performs the login sequence to the SAP application.
+
+    Args:
+        driver (webdriver.Chrome): The Selenium WebDriver instance.
+        max_retries (int, optional): Maximum number of login attempts. Defaults to 3.
+        retry_delay (int, optional): Delay in seconds between retries. Defaults to 5.
+
+    Raises:
+        WebDriverException: If login fails after maximum retries.
     """
 
     def locate_and_fill_element(by, value, keys):
+        """
+        Locates an element and fills it with the provided keys.
+
+        Args:
+            by (selenium.webdriver.common.by.By): The locator type (e.g., By.ID, By.XPATH).
+            value (str): The locator value.
+            keys (str): The keys to send to the element.
+
+        Returns:
+            selenium.webdriver.remote.webelement.WebElement: The located element.
+
+        Raises:
+            WebDriverException: If the element is not found or interaction fails.
+        """
         try:
             element = WebDriverWait(driver, 120).until(
                 EC.presence_of_element_located((by, value))
@@ -403,3 +436,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
