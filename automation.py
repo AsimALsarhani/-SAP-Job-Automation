@@ -100,7 +100,7 @@ def send_email_report(subject, body, sender_email, sender_password, recipient_em
 def initialize_browser():
     """
     Initializes the Chrome WebDriver with specified options,
-    including a unique user data directory.
+    including a unique user data directory and explicitly sets the chrome binary location.
     """
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -118,7 +118,14 @@ def initialize_browser():
     options.add_argument(f"--user-data-dir={unique_dir}")
     logging.info(f"Using unique Chrome user data directory: {unique_dir}")
 
-    # Use the Chrome and ChromeDriver from the system
+    # Specify the path to the Chrome binary (if it's not in the default location)
+    chrome_binary_path = "/usr/bin/google-chrome"  # Update this if Chrome is in a different location
+    if os.path.exists(chrome_binary_path):
+        options.binary_location = chrome_binary_path
+        logging.info(f"Chrome binary found at: {chrome_binary_path}")
+    else:
+        logging.warning(f"Chrome binary not found at: {chrome_binary_path}.  Ensure Chrome is installed and the path is correct.")
+
     chrome_service = ChromeService()
     driver = webdriver.Chrome(service=chrome_service, options=options)
     return driver, unique_dir
@@ -472,8 +479,5 @@ def main():
             shutil.rmtree(driver_user_data_dir)
             logging.info(f"Deleted driver user data directory: {driver_user_data_dir}")
 
-
-
 if __name__ == "__main__":
     main()
-
