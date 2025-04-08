@@ -20,15 +20,15 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome
-RUN curl -Lo /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+RUN curl -Lo /tmp/google-chrome.deb [https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb](https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb) && \
     dpkg -i /tmp/google-chrome.deb || true && \
     apt-get update && apt-get install -f -y && \
     rm /tmp/google-chrome.deb
 
 # Install ChromeDriver matching the installed Chrome version
 RUN CHROME_VERSION=$(google-chrome --version | grep -oP '^\d+') && \
-    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}") && \
-    curl -Lo /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
+    CHROMEDRIVER_VERSION=$(curl -s "[https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$](https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$){CHROME_VERSION}") && \
+    curl -Lo /tmp/chromedriver.zip "[https://chromedriver.storage.googleapis.com/$](https://chromedriver.storage.googleapis.com/$){CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
     unzip /tmp/chromedriver.zip -d /tmp && \
     mv /tmp/chromedriver /usr/bin/chromedriver && \
     chmod +x /usr/bin/chromedriver && \
