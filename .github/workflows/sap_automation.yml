@@ -26,52 +26,62 @@ jobs:
           # Install Chrome and jq (for parsing JSON)
           sudo apt-get install -y google-chrome-stable jq
 
-      - name: Install ChromeDriver using Chrome for Testing API
+      # --- Start of Modified Step ---
+      - name: Install ChromeDriver matching INSTALLED Chrome version
         run: |
-          # Get installed Chrome version
-          CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-          echo "Installed Chrome version: $CHROME_VERSION"
-
-          # Get the corresponding ChromeDriver version using the new JSON API
-          # Fetches the latest known good version for stable channel
-          CHROMEDRIVER_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url')
-
-          if [ -z "$CHROMEDRIVER_URL" ]; then
-            echo "Could not automatically determine ChromeDriver URL. Exiting."
+          # Get the EXACT installed Chrome version
+          INSTALLED_CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+          if [ -z "$INSTALLED_CHROME_VERSION" ]; then
+            echo "Could not determine installed Chrome version. Exiting."
             exit 1
           fi
+          echo "Installed Chrome version: $INSTALLED_CHROME_VERSION"
 
-          echo "ChromeDriver download URL: $CHROMEDRIVER_URL"
+          # Fetch the ChromeDriver download URL specifically for the INSTALLED Chrome version
+          # Uses the latest-patch-versions-per-build endpoint which maps full Chrome versions to ChromeDriver downloads
+          CHROMEDRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url')
+
+          # Check if the URL was found
+          if [ -z "$CHROMEDRIVER_URL" ] || [ "$CHROMEDRIVER_URL" == "null" ]; then
+            echo "ERROR: Could not find ChromeDriver download URL for Chrome version $INSTALLED_CHROME_VERSION."
+            echo "Attempting fallback to latest stable ChromeDriver..."
+            # Fallback: Get the latest stable ChromeDriver URL (original method)
+            CHROMEDRIVER_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url')
+
+            if [ -z "$CHROMEDRIVER_URL" ] || [ "$CHROMEDRIVER_URL" == "null" ]; then
+               echo "ERROR: Fallback failed. Could not determine any ChromeDriver URL. Exiting."
+               exit 1
+            fi
+             echo "Using fallback ChromeDriver URL (latest stable): $CHROMEDRIVER_URL"
+          else
+            echo "Found specific ChromeDriver URL: $CHROMEDRIVER_URL"
+          fi
 
           # Download, unzip, and install ChromeDriver
           wget -N "$CHROMEDRIVER_URL" -O chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip -d . # Unzip to current directory
-          # The zip file often contains a directory like chromedriver-linux64/
-          # Adjust the path if needed based on the actual zip structure
-          # Check if the specific directory exists before moving
-          if [ -d "chromedriver-linux64" ]; then
-             sudo mv chromedriver-linux64/chromedriver /usr/bin/chromedriver
-          else
-             echo "WARN: Expected directory 'chromedriver-linux64' not found after unzip. Trying to move 'chromedriver' directly."
-             # Fallback: Attempt to move if chromedriver is in the root of the zip
-             if [ -f "chromedriver" ]; then
-               sudo mv chromedriver /usr/bin/chromedriver
-             else
-               echo "ERROR: Could not find 'chromedriver' binary after unzip."
-               # List files for debugging
-               ls -la
-               exit 1
-             fi
+          unzip chromedriver_linux64.zip -d /tmp/chromedriver_extracted # Unzip to a temporary specific directory
+
+          # Find the chromedriver binary within the extracted directory structure
+          CHROME_DRIVER_BINARY=$(find /tmp/chromedriver_extracted -type f -name chromedriver | head -n 1)
+
+          if [ -z "$CHROME_DRIVER_BINARY" ]; then
+             echo "ERROR: Could not find 'chromedriver' binary after unzip."
+             ls -la /tmp/chromedriver_extracted # List extracted files for debugging
+             exit 1
           fi
 
+          echo "Moving $CHROME_DRIVER_BINARY to /usr/bin/chromedriver"
+          sudo mv "$CHROME_DRIVER_BINARY" /usr/bin/chromedriver
           sudo chmod +x /usr/bin/chromedriver
-          rm chromedriver_linux64.zip # Clean up zip file
-          # Optional: remove the extracted folder if it exists and you only moved the binary
-          rm -rf chromedriver-linux64
+
+          # Clean up
+          rm chromedriver_linux64.zip
+          rm -rf /tmp/chromedriver_extracted
 
           # Verify installation
           echo "Verifying ChromeDriver installation..."
           chromedriver --version
+      # --- End of Modified Step ---
 
       - name: Install Python packages
         run: |
