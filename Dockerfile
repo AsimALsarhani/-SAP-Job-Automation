@@ -1,3 +1,4 @@
+# Dockerfile
 # Use an official Python runtime as a parent image
 FROM python:3.10-slim-buster
 
@@ -7,11 +8,12 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-# Install system dependencies
+# Install system dependencies including jq
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     unzip \
+    jq \ # Added jq
     libgssapi-krb5-2 \
     libxss1 \
     libasound2 \
@@ -25,32 +27,38 @@ RUN curl -Lo /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-ch
     apt-get update && apt-get install -f -y && \
     rm /tmp/google-chrome.deb
 
-# Install ChromeDriver matching the installed Chrome version, with fallback
-RUN CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    CHROME_MAJOR_VERSION=$(echo $CHROME_FULL_VERSION | cut -d. -f1) && \
-    echo "Chrome full version: ${CHROME_FULL_VERSION}" && \
-    echo "Chrome major version: ${CHROME_MAJOR_VERSION}" && \
-    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}") && \
-    if echo "$CHROMEDRIVER_VERSION" | grep -qi "error"; then \
-      echo "ChromeDriver for Chrome major version ${CHROME_MAJOR_VERSION} not found. Falling back to latest."; \
-      CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"); \
+# Install ChromeDriver using the new Chrome for Testing API
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    echo "Installed Chrome version: ${CHROME_VERSION}" && \
+    # Get the latest stable ChromeDriver URL for linux64
+    CHROMEDRIVER_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url') && \
+    if [ -z "$CHROMEDRIVER_URL" ]; then \
+      echo "Could not automatically determine ChromeDriver URL. Exiting."; \
+      exit 1; \
     fi && \
-    echo "ChromeDriver version: ${CHROMEDRIVER_VERSION}" && \
-    curl -Lo /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
+    echo "ChromeDriver download URL: ${CHROMEDRIVER_URL}" && \
+    # Download, unzip, move, and set permissions
+    curl -Lo /tmp/chromedriver.zip "${CHROMEDRIVER_URL}" && \
     unzip /tmp/chromedriver.zip -d /tmp && \
-    mv /tmp/chromedriver /usr/bin/chromedriver && \
+    # Adjust path based on actual zip contents if needed
+    mv /tmp/chromedriver-linux64/chromedriver /usr/bin/chromedriver && \
     chmod +x /usr/bin/chromedriver && \
-    rm /tmp/chromedriver.zip
+    # Clean up
+    rm /tmp/chromedriver.zip && \
+    rm -rf /tmp/chromedriver-linux64 && \
+    # Verify
+    chromedriver --version
 
-# Set Chrome binary and ChromeDriver paths as environment variables
+# Set Chrome binary and ChromeDriver paths as environment variables (optional but good practice)
 ENV CHROME_PATH="/usr/bin/google-chrome"
 ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
 
-# Install Python dependencies
+# Install Python dependencies from requirements.txt
+# Ensure requirements.txt is in your project root and includes selenium
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make automation.py executable
-RUN chmod +x automation.py
+# Make automation.py executable (Only needed if you run it directly, not via `python automation.py`)
+# RUN chmod +x automation.py
 
 # Specify the command to run when the container starts
 CMD ["python", "automation.py"]
