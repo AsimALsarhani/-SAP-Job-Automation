@@ -8,111 +8,36 @@ on:
 
 jobs:
   execute-job:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Using Linux runner
     timeout-minutes: 25
 
     steps:
+      # 1. Check out the repository code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2. Set up Python environment
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Google Chrome and dependencies
-        run: |
-          sudo apt-get update
-          # Install Chrome and jq
-          sudo apt-get install -y google-chrome-stable jq
+      # 3. Install Chrome and Matching ChromeDriver using a dedicated action
+      # This replaces the previous manual installation steps
+      - name: Set up Chrome and ChromeDriver
+        uses: browser-actions/setup-chrome@latest
+        # By default, this installs the latest stable Chrome version
+        # and the corresponding compatible ChromeDriver.
+        # You could specify a version like this if needed:
+        # with:
+        #   chrome-version: stable # or 'beta', 'dev', 'canary', or specific version like '114'
 
-      # --- Start of Corrected Step using set +e and $? ---
-      - name: Install ChromeDriver matching INSTALLED Chrome version (set +e Handling)
-        run: |
-          # Get the EXACT installed Chrome version
-          INSTALLED_CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-          if [ -z "$INSTALLED_CHROME_VERSION" ]; then
-            echo "ERROR: Could not determine installed Chrome version. Exiting."
-            exit 1
-          fi
-          echo "DEBUG: Installed Chrome version: $INSTALLED_CHROME_VERSION"
-
-          # Attempt to find the specific ChromeDriver URL
-          echo "DEBUG: Attempting to find specific ChromeDriver URL for $INSTALLED_CHROME_VERSION..."
-          set +e # Temporarily disable exit on error for the next command
-          SPECIFIC_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null)
-          JQ_EXIT_STATUS=$? # Capture exit status ($?) immediately after command substitution
-          set -e # Re-enable exit on error
-
-          echo "DEBUG: Result of specific URL lookup: '$SPECIFIC_URL'"
-          echo "DEBUG: Exit status ($?) for specific lookup: $JQ_EXIT_STATUS"
-
-          # Check if jq failed (non-zero exit status) OR if the URL variable is empty or literally the string "null"
-          # Quote the status variable for safety when comparing
-          if [ "$JQ_EXIT_STATUS" -ne 0 ] || [ -z "$SPECIFIC_URL" ] || [ "$SPECIFIC_URL" == "null" ]; then
-            echo "DEBUG: Specific URL lookup failed (jq status: $JQ_EXIT_STATUS) or URL is empty/null. Triggering MILESTONE fallback."
-
-            # --- Fallback Logic ---
-            INSTALLED_CHROME_MAJOR_VERSION=$(echo "$INSTALLED_CHROME_VERSION" | cut -d. -f1)
-            echo "DEBUG: Extracted major version: $INSTALLED_CHROME_MAJOR_VERSION"
-            echo "Attempting fallback to latest ChromeDriver for milestone $INSTALLED_CHROME_MAJOR_VERSION..."
-
-            set +e # Temporarily disable exit on error for the next command
-            FALLBACK_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/latest-releases-per-milestone-with-downloads.json | jq -r --arg major "$INSTALLED_CHROME_MAJOR_VERSION" '.milestones[$major].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null)
-            FALLBACK_JQ_STATUS=$? # Capture exit status ($?) immediately
-            set -e # Re-enable exit on error
-
-            echo "DEBUG: Result of milestone fallback URL lookup: '$FALLBACK_URL'"
-            echo "DEBUG: Exit status ($?) for milestone fallback: $FALLBACK_JQ_STATUS"
-            # --- End Fallback Logic ---
-
-            # Check if milestone fallback also failed (Check exit status OR URL)
-            if [ "$FALLBACK_JQ_STATUS" -ne 0 ] || [ -z "$FALLBACK_URL" ] || [ "$FALLBACK_URL" == "null" ]; then
-               echo "ERROR: Milestone fallback failed (jq status: $FALLBACK_JQ_STATUS) or URL is empty/null. Could not determine any ChromeDriver URL. Exiting."
-               exit 1
-            fi
-             echo "DEBUG: Using milestone fallback ChromeDriver URL."
-             CHROMEDRIVER_URL="$FALLBACK_URL"
-          else
-            echo "DEBUG: Using specific ChromeDriver URL found."
-            CHROMEDRIVER_URL="$SPECIFIC_URL"
-          fi
-
-          echo "DEBUG: Final ChromeDriver URL to download: $CHROMEDRIVER_URL"
-
-          # Download, unzip, and install ChromeDriver
-          wget -N "$CHROMEDRIVER_URL" -O chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip -d /tmp/chromedriver_extracted
-
-          CHROME_DRIVER_BINARY=$(find /tmp/chromedriver_extracted -type f -name chromedriver | head -n 1)
-
-          if [ -z "$CHROME_DRIVER_BINARY" ]; then
-             echo "ERROR: Could not find 'chromedriver' binary after unzip."
-             ls -la /tmp/chromedriver_extracted
-             exit 1
-          fi
-
-          echo "DEBUG: Moving $CHROME_DRIVER_BINARY to /usr/bin/chromedriver"
-          sudo mv "$CHROME_DRIVER_BINARY" /usr/bin/chromedriver
-          sudo chmod +x /usr/bin/chromedriver
-
-          # Clean up
-          rm chromedriver_linux64.zip
-          rm -rf /tmp/chromedriver_extracted
-
-          # Verify installation
-          echo "DEBUG: Verifying installed ChromeDriver version..."
-          if ! CMD_OUTPUT=$(chromedriver --version 2>&1); then
-             echo "WARN: 'chromedriver --version' command failed. Output: $CMD_OUTPUT"
-          else
-             echo "DEBUG: $(echo $CMD_OUTPUT)"
-          fi
-      # --- End of Corrected Step using set +e and $? ---
-
+      # 4. Install required Python packages
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          # Make sure requirements.txt exists and lists selenium
+          # Assumes requirements.txt exists in your repository root
+          # and contains at least 'selenium'
           if [ -f requirements.txt ]; then
              pip install -r requirements.txt
           else
@@ -120,6 +45,7 @@ jobs:
              pip install selenium
           fi
 
+      # 5. Run the automation script
       - name: Run Automation
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
@@ -129,5 +55,13 @@ jobs:
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
         run: |
-          set -x  # Enable detailed logging
+          echo "--- Verifying Versions ---"
+          google-chrome --version
+          chromedriver --version
+          echo "--------------------------"
+
+          echo "--- Running Python Script ---"
+          set -x  # Enable detailed logging for script execution
           python automation.py || { echo 'Automation script failed'; exit 1; }
+          set +x
+          echo "---------------------------"
