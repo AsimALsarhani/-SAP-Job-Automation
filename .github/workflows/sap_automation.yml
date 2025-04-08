@@ -26,9 +26,15 @@ jobs:
 
       - name: Install ChromeDriver
         run: |
-          # Extract only the major version (e.g. "134") from the Chrome version string.
-          CHROME_VERSION=$(google-chrome --version | grep -oP '^\d+')
-          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          # Get the full Chrome version string (e.g. "117.0.5938.92")
+          CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}')
+          # Extract the major version number (e.g. "117")
+          CHROME_MAJOR_VERSION=$(echo $CHROME_FULL_VERSION | cut -d. -f1)
+          echo "Chrome full version: $CHROME_FULL_VERSION"
+          echo "Chrome major version: $CHROME_MAJOR_VERSION"
+          # Get the matching ChromeDriver version using the major version
+          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
+          echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
           wget -N "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
           unzip chromedriver_linux64.zip
           sudo mv chromedriver /usr/bin/chromedriver
@@ -49,4 +55,4 @@ jobs:
           SAP_URL: ${{ secrets.SAP_URL }}
         run: |
           set -x  # Enable detailed logging
-          python automation.py
+          python automation.py || { echo 'Automation script failed'; exit 1; }
