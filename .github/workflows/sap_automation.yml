@@ -26,8 +26,8 @@ jobs:
           # Install Chrome and jq
           sudo apt-get install -y google-chrome-stable jq
 
-      # --- Start of Corrected Step with Improved Error Handling ---
-      - name: Install ChromeDriver matching INSTALLED Chrome version (Improved Error Handling)
+      # --- Start of Corrected Step with PIPESTATUS Error Handling ---
+      - name: Install ChromeDriver matching INSTALLED Chrome version (PIPESTATUS Handling)
         run: |
           # Get the EXACT installed Chrome version
           INSTALLED_CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
@@ -39,24 +39,26 @@ jobs:
 
           # Attempt to find the specific ChromeDriver URL
           echo "DEBUG: Attempting to find specific ChromeDriver URL for $INSTALLED_CHROME_VERSION..."
-          # Run curl | jq, capture output AND exit status. Suppress jq stderr messages for cleaner logs if it fails finding the key.
-          SPECIFIC_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null)
-          JQ_EXIT_STATUS=$? # Capture jq's exit status *immediately* after it runs
+          # Run curl | jq. Use || true to prevent set -e exit if jq fails.
+          SPECIFIC_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null || true)
+          # Check the exit status of jq (the second command in the pipe, index 1)
+          JQ_EXIT_STATUS=${PIPESTATUS[1]}
 
           echo "DEBUG: Result of specific URL lookup: '$SPECIFIC_URL'"
-          echo "DEBUG: jq exit status for specific lookup: $JQ_EXIT_STATUS"
+          echo "DEBUG: PIPESTATUS[1] (jq exit status): $JQ_EXIT_STATUS"
 
           # Check if jq failed (non-zero exit status) OR if the URL variable is empty or literally the string "null"
           if [ $JQ_EXIT_STATUS -ne 0 ] || [ -z "$SPECIFIC_URL" ] || [ "$SPECIFIC_URL" == "null" ]; then
             echo "DEBUG: Specific URL lookup failed (jq status: $JQ_EXIT_STATUS) or URL is empty/null. Triggering fallback."
             echo "Attempting fallback to latest stable ChromeDriver..."
-            # Fallback: Get the latest stable ChromeDriver URL
-            FALLBACK_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url')
-            FALLBACK_JQ_STATUS=$? # Capture fallback jq status
+            # Fallback: Get the latest stable ChromeDriver URL. Use || true here as well.
+            FALLBACK_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null || true)
+            # Check the exit status of the fallback jq command
+            FALLBACK_JQ_STATUS=${PIPESTATUS[1]}
             echo "DEBUG: Result of fallback URL lookup: '$FALLBACK_URL'"
-            echo "DEBUG: jq exit status for fallback lookup: $FALLBACK_JQ_STATUS"
+            echo "DEBUG: PIPESTATUS[1] (fallback jq status): $FALLBACK_JQ_STATUS"
 
-            # Check if fallback also failed
+            # Check if fallback also failed (jq status or empty/null URL)
             if [ $FALLBACK_JQ_STATUS -ne 0 ] || [ -z "$FALLBACK_URL" ] || [ "$FALLBACK_URL" == "null" ]; then
                echo "ERROR: Fallback failed (jq status: $FALLBACK_JQ_STATUS) or URL is empty/null. Could not determine any ChromeDriver URL. Exiting."
                exit 1
@@ -97,7 +99,7 @@ jobs:
           else
              echo "DEBUG: $(echo $CMD_OUTPUT)"
           fi
-      # --- End of Corrected Step with Improved Error Handling ---
+      # --- End of Corrected Step with PIPESTATUS Error Handling ---
 
       - name: Install Python packages
         run: |
