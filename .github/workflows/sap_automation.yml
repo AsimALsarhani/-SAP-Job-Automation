@@ -48,20 +48,41 @@ jobs:
           unzip chromedriver_linux64.zip -d . # Unzip to current directory
           # The zip file often contains a directory like chromedriver-linux64/
           # Adjust the path if needed based on the actual zip structure
-          sudo mv chromedriver-linux64/chromedriver /usr/bin/chromedriver
+          # Check if the specific directory exists before moving
+          if [ -d "chromedriver-linux64" ]; then
+             sudo mv chromedriver-linux64/chromedriver /usr/bin/chromedriver
+          else
+             echo "WARN: Expected directory 'chromedriver-linux64' not found after unzip. Trying to move 'chromedriver' directly."
+             # Fallback: Attempt to move if chromedriver is in the root of the zip
+             if [ -f "chromedriver" ]; then
+               sudo mv chromedriver /usr/bin/chromedriver
+             else
+               echo "ERROR: Could not find 'chromedriver' binary after unzip."
+               # List files for debugging
+               ls -la
+               exit 1
+             fi
+          fi
+
           sudo chmod +x /usr/bin/chromedriver
           rm chromedriver_linux64.zip # Clean up zip file
           # Optional: remove the extracted folder if it exists and you only moved the binary
           rm -rf chromedriver-linux64
 
           # Verify installation
+          echo "Verifying ChromeDriver installation..."
           chromedriver --version
 
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          # Assuming requirements.txt exists and lists selenium
-          pip install -r requirements.txt
+          # Make sure requirements.txt exists and lists selenium
+          if [ -f requirements.txt ]; then
+             pip install -r requirements.txt
+          else
+             echo "requirements.txt not found, installing selenium directly"
+             pip install selenium
+          fi
 
       - name: Run Automation
         env:
