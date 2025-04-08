@@ -1,9 +1,10 @@
+# .github/workflows/sap_automation.yml
 name: SAP Automation
 
 on:
   schedule:
     - cron: "0 * * * *"  # Hourly execution
-  workflow_dispatch:     # Manual trigger
+  workflow_dispatch:      # Manual trigger
 
 jobs:
   execute-job:
@@ -12,43 +13,55 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Updated checkout action version
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Updated setup-python action version
         with:
           python-version: '3.10'
 
-      - name: Install Google Chrome
+      - name: Install Google Chrome and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          # Install Chrome and jq (for parsing JSON)
+          sudo apt-get install -y google-chrome-stable jq
 
-      - name: Install ChromeDriver
+      - name: Install ChromeDriver using Chrome for Testing API
         run: |
-          # Get the full Chrome version string (e.g. "134.0.6998.165")
-          CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}')
-          # Extract the major version number (e.g. "134")
-          CHROME_MAJOR_VERSION=$(echo $CHROME_FULL_VERSION | cut -d. -f1)
-          echo "Chrome full version: $CHROME_FULL_VERSION"
-          echo "Chrome major version: $CHROME_MAJOR_VERSION"
-          # Get the matching ChromeDriver version using the major version
-          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
-          # Check if the returned string contains an error and fallback if needed
-          if echo "$CHROMEDRIVER_VERSION" | grep -qi "error"; then
-            echo "ChromeDriver version for Chrome major version ${CHROME_MAJOR_VERSION} not found. Falling back to latest available version."
-            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+          # Get installed Chrome version
+          CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
+          echo "Installed Chrome version: $CHROME_VERSION"
+
+          # Get the corresponding ChromeDriver version using the new JSON API
+          # Fetches the latest known good version for stable channel
+          CHROMEDRIVER_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform=="linux64") | .url')
+
+          if [ -z "$CHROMEDRIVER_URL" ]; then
+            echo "Could not automatically determine ChromeDriver URL. Exiting."
+            exit 1
           fi
-          echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
-          wget -N "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/bin/chromedriver
+
+          echo "ChromeDriver download URL: $CHROMEDRIVER_URL"
+
+          # Download, unzip, and install ChromeDriver
+          wget -N "$CHROMEDRIVER_URL" -O chromedriver_linux64.zip
+          unzip chromedriver_linux64.zip -d . # Unzip to current directory
+          # The zip file often contains a directory like chromedriver-linux64/
+          # Adjust the path if needed based on the actual zip structure
+          sudo mv chromedriver-linux64/chromedriver /usr/bin/chromedriver
           sudo chmod +x /usr/bin/chromedriver
+          rm chromedriver_linux64.zip # Clean up zip file
+          # Optional: remove the extracted folder if it exists and you only moved the binary
+          rm -rf chromedriver-linux64
+
+          # Verify installation
+          chromedriver --version
 
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install selenium
+          # Assuming requirements.txt exists and lists selenium
+          pip install -r requirements.txt
 
       - name: Run Automation
         env:
