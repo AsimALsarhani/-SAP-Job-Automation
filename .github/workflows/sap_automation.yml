@@ -26,7 +26,7 @@ jobs:
           # Install Chrome and jq
           sudo apt-get install -y google-chrome-stable jq
 
-      # --- Start of Step with Enhanced Debugging ---
+      # --- Start of Corrected Step with Debugging ---
       - name: Install ChromeDriver matching INSTALLED Chrome version (with Debugging)
         run: |
           # Get the EXACT installed Chrome version
@@ -91,7 +91,7 @@ jobs:
           else
              echo "DEBUG: $(echo $CMD_OUTPUT)" # Print successful version output
           fi
-      # --- End of Step with Enhanced Debugging ---
+      # --- End of Corrected Step with Debugging ---
 
       - name: Install Python packages
         run: |
