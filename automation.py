@@ -1,4 +1,4 @@
-Here are the two updated code segments:Python Script (automation.py)This is the refined Python script for SAP automation, incorporating best practices for error handling, logging, and browser management.import os
+import os
 import time
 import logging
 import smtplib
@@ -188,4 +188,3 @@ def main_execution():
 
 if __name__ == "__main__":
     main_execution()
-
