@@ -53,4 +53,11 @@ jobs:
       - name: Run Automation
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
-          SAP_PASSWORD: ${{ secrets.S_
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SAP_URL: ${{ secrets.SAP_URL }}
+        run: |
+          set -x  # Enable detailed logging
+          python automation.py || { echo 'Automation script failed'; exit 1; }
