@@ -57,7 +57,7 @@ def initialize_browser():
     options.add_argument("--disable-features=ChromeWhatsNew")
     options.add_argument("--disable-blink-features=AutomationControlled")
     
-    # Set the Chrome binary location
+    # Set the Chrome binary location from the environment variable or default
     chrome_binary_path = os.environ.get("CHROME_PATH", "/usr/bin/google-chrome")
     options.binary_location = chrome_binary_path
 
@@ -65,7 +65,7 @@ def initialize_browser():
     chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
     service = ChromeService(executable_path=chromedriver_path)
     driver = webdriver.Chrome(service=service, options=options)
-    # Remove webdriver flag for automation evasion
+    # Remove the webdriver flag for automation evasion
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return driver
 
@@ -74,11 +74,9 @@ def perform_login(driver, max_retries=5, retry_delay=5):
     for attempt in range(max_retries):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
-
-            # Navigate to the login URL
             driver.get(SAP_URL)
 
-            # Optional frame switch if needed – adjust or comment out if not used.
+            # Optional: if a frame is present, switch to it.
             try:
                 WebDriverWait(driver, 10).until(
                     EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
