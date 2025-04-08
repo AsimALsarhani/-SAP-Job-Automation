@@ -31,7 +31,7 @@ RUN CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}') && \
     echo "Chrome full version: ${CHROME_FULL_VERSION}" && \
     echo "Chrome major version: ${CHROME_MAJOR_VERSION}" && \
     CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}") && \
-    if echo "$CHROMEDRIVER_VERSION" | grep -q "<Error>"; then \
+    if echo "$CHROMEDRIVER_VERSION" | grep -qi "error"; then \
       echo "ChromeDriver for Chrome major version ${CHROME_MAJOR_VERSION} not found. Falling back to latest."; \
       CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"); \
     fi && \
