@@ -26,8 +26,8 @@ jobs:
           # Install Chrome and jq
           sudo apt-get install -y google-chrome-stable jq
 
-      # --- Start of Corrected Step with Milestone Fallback ---
-      - name: Install ChromeDriver matching INSTALLED Chrome version (Milestone Fallback)
+      # --- Start of Corrected Step using set +e and $? ---
+      - name: Install ChromeDriver matching INSTALLED Chrome version (set +e Handling)
         run: |
           # Get the EXACT installed Chrome version
           INSTALLED_CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
@@ -37,33 +37,38 @@ jobs:
           fi
           echo "DEBUG: Installed Chrome version: $INSTALLED_CHROME_VERSION"
 
-          # Attempt to find the specific ChromeDriver URL using latest-patch-versions-per-build
+          # Attempt to find the specific ChromeDriver URL
           echo "DEBUG: Attempting to find specific ChromeDriver URL for $INSTALLED_CHROME_VERSION..."
-          SPECIFIC_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null || true)
-          JQ_EXIT_STATUS=${PIPESTATUS[1]} # Check jq's exit status
+          set +e # Temporarily disable exit on error for the next command
+          SPECIFIC_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build.json" | jq -r --arg ver "$INSTALLED_CHROME_VERSION" '.builds[$ver].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null)
+          JQ_EXIT_STATUS=$? # Capture exit status ($?) immediately after command substitution
+          set -e # Re-enable exit on error
 
           echo "DEBUG: Result of specific URL lookup: '$SPECIFIC_URL'"
-          echo "DEBUG: PIPESTATUS[1] (jq exit status for specific): $JQ_EXIT_STATUS"
+          echo "DEBUG: Exit status ($?) for specific lookup: $JQ_EXIT_STATUS"
 
-          # Check if specific lookup failed (jq status or empty/null URL)
-          if [ $JQ_EXIT_STATUS -ne 0 ] || [ -z "$SPECIFIC_URL" ] || [ "$SPECIFIC_URL" == "null" ]; then
+          # Check if jq failed (non-zero exit status) OR if the URL variable is empty or literally the string "null"
+          # Quote the status variable for safety when comparing
+          if [ "$JQ_EXIT_STATUS" -ne 0 ] || [ -z "$SPECIFIC_URL" ] || [ "$SPECIFIC_URL" == "null" ]; then
             echo "DEBUG: Specific URL lookup failed (jq status: $JQ_EXIT_STATUS) or URL is empty/null. Triggering MILESTONE fallback."
 
-            # --- Modified Fallback Logic ---
+            # --- Fallback Logic ---
             INSTALLED_CHROME_MAJOR_VERSION=$(echo "$INSTALLED_CHROME_VERSION" | cut -d. -f1)
             echo "DEBUG: Extracted major version: $INSTALLED_CHROME_MAJOR_VERSION"
             echo "Attempting fallback to latest ChromeDriver for milestone $INSTALLED_CHROME_MAJOR_VERSION..."
-            # Fallback: Get the latest ChromeDriver URL for the installed MAJOR version (milestone)
-            FALLBACK_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/latest-releases-per-milestone-with-downloads.json | jq -r --arg major "$INSTALLED_CHROME_MAJOR_VERSION" '.milestones[$major].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null || true)
-            FALLBACK_JQ_STATUS=${PIPESTATUS[1]} # Check jq status for milestone lookup
-            echo "DEBUG: Result of milestone fallback URL lookup: '$FALLBACK_URL'"
-            echo "DEBUG: PIPESTATUS[1] (milestone fallback jq status): $FALLBACK_JQ_STATUS"
-            # --- End Modified Fallback Logic ---
 
-            # Check if milestone fallback also failed
-            if [ $FALLBACK_JQ_STATUS -ne 0 ] || [ -z "$FALLBACK_URL" ] || [ "$FALLBACK_URL" == "null" ]; then
+            set +e # Temporarily disable exit on error for the next command
+            FALLBACK_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/latest-releases-per-milestone-with-downloads.json | jq -r --arg major "$INSTALLED_CHROME_MAJOR_VERSION" '.milestones[$major].downloads.chromedriver[] | select(.platform=="linux64") | .url' 2>/dev/null)
+            FALLBACK_JQ_STATUS=$? # Capture exit status ($?) immediately
+            set -e # Re-enable exit on error
+
+            echo "DEBUG: Result of milestone fallback URL lookup: '$FALLBACK_URL'"
+            echo "DEBUG: Exit status ($?) for milestone fallback: $FALLBACK_JQ_STATUS"
+            # --- End Fallback Logic ---
+
+            # Check if milestone fallback also failed (Check exit status OR URL)
+            if [ "$FALLBACK_JQ_STATUS" -ne 0 ] || [ -z "$FALLBACK_URL" ] || [ "$FALLBACK_URL" == "null" ]; then
                echo "ERROR: Milestone fallback failed (jq status: $FALLBACK_JQ_STATUS) or URL is empty/null. Could not determine any ChromeDriver URL. Exiting."
-               # As a last resort, could try latest-stable again here, but it might cause the version mismatch.
                exit 1
             fi
              echo "DEBUG: Using milestone fallback ChromeDriver URL."
@@ -100,9 +105,9 @@ jobs:
           if ! CMD_OUTPUT=$(chromedriver --version 2>&1); then
              echo "WARN: 'chromedriver --version' command failed. Output: $CMD_OUTPUT"
           else
-             echo "DEBUG: $(echo $CMD_OUTPUT)" # Print successful version output
+             echo "DEBUG: $(echo $CMD_OUTPUT)"
           fi
-      # --- End of Corrected Step with Milestone Fallback ---
+      # --- End of Corrected Step using set +e and $? ---
 
       - name: Install Python packages
         run: |
