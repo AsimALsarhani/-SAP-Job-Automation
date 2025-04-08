@@ -10,12 +10,12 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     ElementNotInteractableException,
     StaleElementReferenceException,
+    NoSuchFrameException,
 )
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
 # Environment Configuration
@@ -43,7 +43,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-
 def initialize_browser():
     """Configure Chrome with optimal headless settings"""
     options = Options()
@@ -56,11 +55,19 @@ def initialize_browser():
     options.add_argument("--ignore-certificate-errors")
     options.add_argument("--allow-insecure-localhost")
     options.add_argument("--disable-features=ChromeWhatsNew")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    
+    # Set the Chrome binary location
+    chrome_binary_path = os.environ.get("CHROME_PATH", "/usr/bin/google-chrome")
+    options.binary_location = chrome_binary_path
 
-    service = ChromeService(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=options)
-
-
+    # Use the ChromeDriver installed at the expected path
+    chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+    service = ChromeService(executable_path=chromedriver_path)
+    driver = webdriver.Chrome(service=service, options=options)
+    # Remove webdriver flag for automation evasion
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    return driver
 
 def perform_login(driver, max_retries=5, retry_delay=5):
     """Execute login with robust error handling and retries"""
@@ -68,50 +75,62 @@ def perform_login(driver, max_retries=5, retry_delay=5):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
 
-            # Username Entry
+            # Navigate to the login URL
+            driver.get(SAP_URL)
+
+            # Optional frame switch if needed – adjust or comment out if not used.
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
+                )
+                logging.info("Switched to frame (if present).")
+            except TimeoutException:
+                logging.info("No frame found, proceeding without switching.")
+
+            time.sleep(1)
+
+            # Enter username
             logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 30).until(
+            username_field = WebDriverWait(driver, 40).until(
                 EC.presence_of_element_located((By.ID, "username"))
             )
             logging.info("Username field found. Sending keys: %s", SAP_USERNAME)
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
 
-            # Password Entry
+            # Enter password
             logging.info("Waiting for password field...")
-            password_field = WebDriverWait(driver, 20).until(
+            password_field = WebDriverWait(driver, 40).until(
                 EC.presence_of_element_located((By.ID, "password"))
             )
             logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Sign In Button
+            # Click Sign In button
             logging.info("Waiting for Sign In button...")
-            # Use a combination of locators for robustness
-            sign_in_button = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located(
-                    (By.ID, "signIn")
+            try:
+                sign_in_button = WebDriverWait(driver, 40).until(
+                    EC.element_to_be_clickable((By.ID, "signIn"))
                 )
-                or EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "input[type='submit'][value='Sign In']")  # Added CSS Selector
+            except TimeoutException:
+                logging.info("Sign In button not found by ID, trying alternative locator.")
+                sign_in_button = WebDriverWait(driver, 40).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
                 )
-                or EC.presence_of_element_located(
-                    (By.XPATH, "//button[contains(text(),'Sign In')]") # Added XPath
-                )
-            )
             logging.info("Sign In button found. Clicking.")
-            sign_in_button.click()
+            driver.execute_script("arguments[0].click();", sign_in_button)
 
-            # Post-Login Verification
+            # Verify post-login element
             logging.info("Waiting for post-login verification element...")
-            WebDriverWait(driver, 45).until(
+            WebDriverWait(driver, 60).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".sap-main-content"))
             )
             logging.info("Login successful")
             return
 
-       except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
+        except (TimeoutException, NoSuchElementException, ElementNotInteractableException,
+                StaleElementReferenceException, WebDriverException, NoSuchFrameException) as e:
             logging.error(f"Login failure: {str(e)}")
             driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
@@ -121,17 +140,6 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 driver.refresh()
             else:
                 raise
-       except WebDriverException as e:
-            logging.error(f"WebDriverException: {e}")
-            driver.save_screenshot(f"webdriver_exception_{attempt + 1}.png")
-            logging.error(f"Page source: {driver.page_source}")
-            if attempt < max_retries - 1:
-                logging.info(f"Retrying login in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                driver.refresh()
-            else:
-                raise
-
 
 def send_report(screenshot_path):
     """Send email with attachment"""
@@ -155,8 +163,6 @@ def send_report(screenshot_path):
         logging.error(f"Email failure: {str(e)}")
         raise
 
-
-
 def main_execution():
     """Main workflow controller"""
     driver = None
@@ -167,7 +173,7 @@ def main_execution():
 
         perform_login(driver)
 
-        # Capture Evidence
+        # Capture evidence
         time.sleep(3)
         screenshot_path = "success_report.png"
         driver.save_screenshot(screenshot_path)
@@ -184,7 +190,6 @@ def main_execution():
         if driver:
             driver.quit()
             logging.info("Browser terminated")
-
 
 if __name__ == "__main__":
     main_execution()
