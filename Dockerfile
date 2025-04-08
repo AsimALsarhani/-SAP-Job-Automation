@@ -25,12 +25,16 @@ RUN curl -Lo /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-ch
     apt-get update && apt-get install -f -y && \
     rm /tmp/google-chrome.deb
 
-# Install ChromeDriver matching the installed Chrome version
+# Install ChromeDriver matching the installed Chrome version, with fallback
 RUN CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}') && \
     CHROME_MAJOR_VERSION=$(echo $CHROME_FULL_VERSION | cut -d. -f1) && \
     echo "Chrome full version: ${CHROME_FULL_VERSION}" && \
     echo "Chrome major version: ${CHROME_MAJOR_VERSION}" && \
     CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}") && \
+    if echo "$CHROMEDRIVER_VERSION" | grep -q "<Error>"; then \
+      echo "ChromeDriver for Chrome major version ${CHROME_MAJOR_VERSION} not found. Falling back to latest."; \
+      CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE"); \
+    fi && \
     echo "ChromeDriver version: ${CHROMEDRIVER_VERSION}" && \
     curl -Lo /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
     unzip /tmp/chromedriver.zip -d /tmp && \
