@@ -26,14 +26,20 @@ jobs:
 
       - name: Install ChromeDriver
         run: |
-          # Get the full Chrome version string (e.g. "117.0.5938.92")
+          # Get the full Chrome version string (e.g., "134.0.6998.165")
           CHROME_FULL_VERSION=$(google-chrome --version | awk '{print $3}')
-          # Extract the major version number (e.g. "117")
+          # Extract the major version number (e.g., "134")
           CHROME_MAJOR_VERSION=$(echo $CHROME_FULL_VERSION | cut -d. -f1)
           echo "Chrome full version: $CHROME_FULL_VERSION"
           echo "Chrome major version: $CHROME_MAJOR_VERSION"
           # Get the matching ChromeDriver version using the major version
           CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}")
+          # If the response contains an error, fall back to the latest available version
+          if echo "$CHROMEDRIVER_VERSION" | grep -q "<Error>"; then
+            echo "ChromeDriver version for Chrome major version ${CHROME_MAJOR_VERSION} not found."
+            echo "Falling back to the latest ChromeDriver version."
+            CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+          fi
           echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
           wget -N "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
           unzip chromedriver_linux64.zip
