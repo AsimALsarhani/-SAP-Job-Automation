@@ -111,7 +111,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
             logging.info("Login successful")
             return
 
-        except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
+       except (TimeoutException, NoSuchElementException, ElementNotInteractableException, StaleElementReferenceException) as e:
             logging.error(f"Login failure: {str(e)}")
             driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
@@ -121,7 +121,7 @@ def perform_login(driver, max_retries=5, retry_delay=5):
                 driver.refresh()
             else:
                 raise
-        except WebDriverException as e:
+       except WebDriverException as e:
             logging.error(f"WebDriverException: {e}")
             driver.save_screenshot(f"webdriver_exception_{attempt + 1}.png")
             logging.error(f"Page source: {driver.page_source}")
