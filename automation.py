@@ -30,8 +30,7 @@ SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set")
 if not SAP_USERNAME or not SAP_PASSWORD:
-     logging.warning("SAP_USERNAME or SAP_PASSWORD environment variable not set.") # Warning instead of fail
-# Basic email format check
+     logging.warning("SAP_USERNAME or SAP_PASSWORD environment variable not set.")
 if not all(["@" in email for email in [SENDER_EMAIL, RECIPIENT_EMAIL]]):
     raise ValueError("Invalid email configuration (SENDER_EMAIL or RECIPIENT_EMAIL)")
 
@@ -59,7 +58,7 @@ def initialize_browser():
     options.add_argument("--allow-insecure-localhost")
     options.add_argument("--disable-features=ChromeWhatsNew")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36') # Example user agent
+    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36')
 
     try:
         driver = webdriver.Chrome(options=options)
@@ -70,28 +69,27 @@ def initialize_browser():
         logging.error("Ensure ChromeDriver is installed and in the system's PATH.")
         raise
 
-# ---vvv--- MODIFIED max_retries default value ---vvv---
-def perform_login(driver, max_retries=3, retry_delay=5): # Changed max_retries default to 3
-# ---^^^--- MODIFIED max_retries default value ---^^^---
+def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
     """Execute login with robust error handling and retries"""
-    # --- !! IMPORTANT !! ---
-    # YOU MUST CHANGE '.login-error-class-name' TO THE CORRECT CSS SELECTOR
+    # --- !! CRITICAL !! ---
+    # YOU MUST CHANGE '.login-error-class-name' TO THE *ACTUAL* CSS SELECTOR
     # FOR LOGIN ERROR MESSAGES ON YOUR SAP PORTAL PAGE.
-    # Inspect the page after a failed login using browser dev tools (F12).
     LOGIN_ERROR_SELECTOR = (By.CSS_SELECTOR, ".login-error-class-name") # <<< --- CHANGE THIS SELECTOR
-    LOGIN_SUCCESS_SELECTOR = (By.CSS_SELECTOR, ".sap-main-content") # <<< --- VERIFY THIS SELECTOR
 
-    last_exception = None # Store last exception for re-raising
+    # --- !! CRITICAL !! ---
+    # YOU MUST CHANGE '.sap-main-content' TO A *RELIABLE* CSS SELECTOR
+    # FOR AN ELEMENT THAT APPEARS *AFTER* SUCCESSFUL LOGIN. Inspect the page!
+    LOGIN_SUCCESS_SELECTOR = (By.CSS_SELECTOR, ".sap-main-content") # <<< --- CHANGE THIS SELECTOR
+
+    last_exception = None
 
     for attempt in range(max_retries):
         try:
-            # Log attempt using max_retries parameter
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
             logging.info("Navigating to SAP URL...")
             driver.get(SAP_URL)
             time.sleep(2)
 
-            # Optional: Frame handling
             try:
                 WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID")))
                 logging.info("Switched to frame (if present).")
@@ -100,21 +98,18 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Changed max_retries d
 
             time.sleep(1)
 
-            # Enter username
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "username")))
             logging.info("Username field found. Sending keys...")
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
 
-            # Enter password
             logging.info("Waiting for password field...")
             password_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "password")))
             logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Click Sign In button
             logging.info("Waiting for Sign In button...")
             try:
                 sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.ID, "signIn")))
@@ -124,35 +119,45 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Changed max_retries d
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
 
-            # Wait for EITHER successful login element OR an error message
             logging.info("Waiting for post-login verification OR error message...")
-            wait = WebDriverWait(driver, 120)
+            wait = WebDriverWait(driver, 120) # 2 minute wait
+            # Wait for EITHER the SUCCESS selector OR the ERROR selector you defined above
             element_found = wait.until(EC.any_of(
-                 EC.presence_of_element_located(LOGIN_SUCCESS_SELECTOR),
-                 EC.presence_of_element_located(LOGIN_ERROR_SELECTOR) # <<< --- USES THE SELECTOR YOU NEED TO CHANGE
+                 EC.presence_of_element_located(LOGIN_SUCCESS_SELECTOR), # <<<--- USES THE SELECTOR YOU MUST CHANGE/VERIFY
+                 EC.presence_of_element_located(LOGIN_ERROR_SELECTOR)   # <<<--- USES THE SELECTOR YOU MUST CHANGE
             ))
+            logging.info("Found either success or error element after wait.") # Added log
 
             # Check which element was found
             try:
-                success_element = driver.find_element(*LOGIN_SUCCESS_SELECTOR)
+                # Try finding the success element first after the wait returns
+                success_element = driver.find_element(*LOGIN_SUCCESS_SELECTOR) # <<<--- USES THE SELECTOR YOU MUST CHANGE/VERIFY
                 logging.info("Login successful (found success element).")
                 return # Successful login, exit function
             except NoSuchElementException:
+                 # Success element wasn't present, check if the error element was
+                 logging.info("Success element not found, checking for error element...") # Added log
                  try:
-                      error_element = driver.find_element(*LOGIN_ERROR_SELECTOR) # <<< --- USES THE SELECTOR YOU NEED TO CHANGE
+                      error_element = driver.find_element(*LOGIN_ERROR_SELECTOR) # <<<--- USES THE SELECTOR YOU MUST CHANGE
                       error_text = error_element.text.strip()
-                      logging.error(f"Login error element found: {error_text}")
+                      logging.error(f"Login error element found with text: '{error_text}'")
                       screenshot_filename = f"login_error_attempt_{attempt + 1}.png"
                       driver.save_screenshot(screenshot_filename)
                       logging.info(f"Screenshot saved: {screenshot_filename}")
+                      # Raise an exception because login failed
                       raise Exception(f"Login failed. Error element found: {error_text}")
                  except NoSuchElementException:
-                      logging.error("EC.any_of succeeded but couldn't find success or error element after.")
-                      raise TimeoutException("Post-login state uncertain after wait.")
+                      # This state means EC.any_of returned true, but neither specific element is findable now.
+                      # This might happen if the element appeared briefly and disappeared, or if the state is weird.
+                      logging.error("EC.any_of succeeded but couldn't find success or specified error element immediately after.")
+                      # Save screenshot here too for debugging this weird state
+                      screenshot_filename = f"login_ambiguous_state_{attempt + 1}.png"
+                      driver.save_screenshot(screenshot_filename)
+                      logging.info(f"Screenshot saved: {screenshot_filename}")
+                      raise TimeoutException("Post-login state uncertain after wait (neither known success nor known error element found).")
 
         except Exception as e:
             last_exception = e
-            # Log attempt using max_retries parameter
             logging.error(f"Login attempt {attempt + 1}/{max_retries} failed: {str(e)}")
             screenshot_filename = f"login_failure_attempt_{attempt + 1}.png"
             try:
@@ -208,8 +213,7 @@ def main_execution():
     driver = None
     try:
         driver = initialize_browser()
-        # Call perform_login with specific retry count if needed, otherwise uses default
-        perform_login(driver) # Uses default max_retries=3 now
+        perform_login(driver) # Uses default max_retries=3
 
         logging.info("Login successful, performing post-login actions...")
         time.sleep(3)
