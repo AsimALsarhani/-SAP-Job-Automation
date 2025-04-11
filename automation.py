@@ -72,9 +72,10 @@ def initialize_browser():
 def perform_login(driver, max_retries=3, retry_delay=5):
     """
     Execute login with robust error handling and retries.
-    Verifies login by waiting for the 'Save' button.
+    Confirms login by waiting for the 'Save' button (scrolling it into view) to become clickable.
     """
-    # Use a flexible XPath that finds any element whose id contains ":_saveBtn"
+    # Use a flexible XPath selector that finds any element whose ID contains ":_saveBtn"
+    # This avoids issues if the numeric part is dynamic.
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
     last_exception = None
 
@@ -85,7 +86,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             driver.get(SAP_URL)
             time.sleep(2)
 
-            # Optional: Frame handling
+            # Optional: Handle frame if necessary.
             try:
                 WebDriverWait(driver, 10).until(
                     EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
@@ -96,7 +97,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
 
             time.sleep(1)
 
-            # Enter username
+            # Enter username.
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "username"))
@@ -105,7 +106,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
 
-            # Enter password
+            # Enter password.
             logging.info("Waiting for password field...")
             password_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "password"))
@@ -114,7 +115,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
 
-            # Click Sign In button
+            # Click Sign In button.
             logging.info("Waiting for Sign In button...")
             try:
                 sign_in_button = WebDriverWait(driver, 90).until(
@@ -127,12 +128,14 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 )
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(2)  # Pause after clicking
+            time.sleep(2)
 
-            # --- VERIFICATION WITH SCROLLING ---
-            logging.info("Waiting for Save button presence in DOM using flexible selector...")
+            # Verify login by waiting for the Save button.
+            logging.info("Waiting for Save button presence in DOM...")
             wait = WebDriverWait(driver, 90)
-            save_button_element = wait.until(EC.presence_of_element_located(SAVE_BUTTON_SELECTOR))
+            save_button_element = wait.until(
+                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR)
+            )
             logging.info("Save button present in DOM.")
 
             logging.info("Scrolling Save button into view...")
@@ -140,9 +143,10 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             time.sleep(0.5)
 
             logging.info("Waiting for Save button to be clickable after scrolling...")
-            WebDriverWait(driver, 30).until(EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR))
+            WebDriverWait(driver, 30).until(
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR)
+            )
             logging.info("Save button is clickable. Assuming login successful.")
-            # --- END VERIFICATION ---
             return
 
         except Exception as e:
@@ -155,7 +159,6 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 logging.info(f"Screenshot saved: {screenshot_filename}")
             except Exception as screenshot_err:
                 logging.error(f"Could not save screenshot or get URL: {screenshot_err}")
-
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
                 time.sleep(retry_delay)
@@ -164,7 +167,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 raise last_exception
 
 def send_report(screenshot_path):
-    """Send email with attachment."""
+    """Send an email with the given screenshot as attachment."""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         logging.error("Sender email or password not configured. Cannot send report.")
         return
@@ -199,10 +202,10 @@ def send_report(screenshot_path):
 def main_execution():
     """Main workflow controller."""
     driver = None
-    wait_time_short = 30  # Standard wait for elements
-    wait_time_long = 90   # Longer wait if needed
+    wait_time_short = 30
+    wait_time_long = 90
 
-    # Use the flexible XPath selector for the Save button.
+    # Use a flexible XPath for the Save button.
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
 
     try:
@@ -224,39 +227,44 @@ def main_execution():
         except (NoSuchElementException, TimeoutException) as e:
             logging.warning(f"Could not click the 'Save' button after login: {e}")
 
-        # --- Action: Click Careers Site link ---
+        # --- Action: Click Careers Site link with retry logic ---
         try:
             logging.info("Waiting for Careers Site link...")
-            # Use a flexible, case-insensitive XPath for the Careers Site link.
             careers_link_selector = (By.XPATH, "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site')]")
-            careers_link = WebDriverWait(driver, wait_time_short).until(
-                EC.element_to_be_clickable(careers_link_selector)
-            )
-            logging.info("Scrolling Careers Site link into view...")
-            driver.execute_script("arguments[0].scrollIntoView(true);", careers_link)
-            time.sleep(0.5)
-            logging.info("Re-locating Careers Site link to avoid stale reference...")
-            careers_link = driver.find_element(*careers_link_selector)
-            logging.info("Clicking Careers Site link using JavaScript...")
-            driver.execute_script("arguments[0].click();", careers_link)
-            logging.info("Careers Site link clicked.")
-            time.sleep(3)
-            # Wait for navigation: check either title or URL contains 'career'
-            logging.info("Waiting for navigation: title or URL to contain 'career'...")
-            WebDriverWait(driver, wait_time_long).until(
-                lambda drv: "career" in drv.title.lower() or "career" in drv.current_url.lower()
-            )
-            current_url = driver.current_url
-            current_title = driver.title
-            logging.info(f"After clicking Careers Site, URL: {current_url}, Title: {current_title}")
-        except (TimeoutException, StaleElementReferenceException) as e:
-            logging.warning(f"Error clicking Careers Site link: {e}")
-            raise e
+            for attempt in range(3):
+                try:
+                    logging.info(f"Attempt {attempt + 1} to locate and click Careers Site link...")
+                    careers_link = WebDriverWait(driver, wait_time_short).until(
+                        EC.element_to_be_clickable(careers_link_selector)
+                    )
+                    logging.info("Scrolling Careers Site link into view...")
+                    driver.execute_script("arguments[0].scrollIntoView(true);", careers_link)
+                    time.sleep(0.5)
+                    logging.info("Clicking Careers Site link using JavaScript...")
+                    driver.execute_script("arguments[0].click();", careers_link)
+                    logging.info("Careers Site link clicked.")
+                    # Verify navigation by checking title or URL.
+                    WebDriverWait(driver, wait_time_long).until(
+                        lambda drv: "career" in drv.title.lower() or "career" in drv.current_url.lower()
+                    )
+                    logging.info("Navigation to Careers Site successful.")
+                    break
+                except (TimeoutException, StaleElementReferenceException) as e:
+                    logging.warning(f"Attempt {attempt + 1} to click Careers Site link failed: {e}")
+                    if attempt < 2:
+                        time.sleep(2)
+                    else:
+                        logging.error("All attempts to locate and click Careers Site link failed.")
+                        raise e
+        except Exception as e:
+            logging.error(f"Error clicking Careers Site link: {e}")
+            raise
 
         logging.info("Post-login actions completed.")
         screenshot_path = "final_state_report.png"
         driver.save_screenshot(screenshot_path)
         logging.info(f"Final state screenshot captured: {screenshot_path}")
+
         send_report(screenshot_path)
 
     except Exception as e:
