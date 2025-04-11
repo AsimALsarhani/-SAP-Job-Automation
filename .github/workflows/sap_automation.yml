@@ -23,21 +23,14 @@ jobs:
           python-version: '3.10'
 
       # 3. Install Chrome and Matching ChromeDriver using a dedicated action
-      # This replaces the previous manual installation steps
       - name: Set up Chrome and ChromeDriver
         uses: browser-actions/setup-chrome@latest
-        # By default, this installs the latest stable Chrome version
-        # and the corresponding compatible ChromeDriver.
-        # You could specify a version like this if needed:
-        # with:
-        #   chrome-version: stable # or 'beta', 'dev', 'canary', or specific version like '114'
+        id: setup-chrome # Add an ID to potentially reference installed versions if needed
 
       # 4. Install required Python packages
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          # Assumes requirements.txt exists in your repository root
-          # and contains at least 'selenium'
           if [ -f requirements.txt ]; then
              pip install -r requirements.txt
           else
@@ -54,6 +47,9 @@ jobs:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
+          # Optional: Pass installed versions to Python if needed
+          # CHROME_VERSION: ${{ steps.setup-chrome.outputs.chrome-version }}
+          # CHROMEDRIVER_VERSION: ${{ steps.setup-chrome.outputs.chromedriver-version }}
         run: |
           echo "--- Verifying Versions ---"
           google-chrome --version
@@ -61,7 +57,19 @@ jobs:
           echo "--------------------------"
 
           echo "--- Running Python Script ---"
-          set -x  # Enable detailed logging for script execution
+          set -x
           python automation.py || { echo 'Automation script failed'; exit 1; }
           set +x
           echo "---------------------------"
+
+      # 6. Upload screenshots on failure
+      - name: Upload failure screenshots
+        if: failure() # Only run this step if the workflow failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: | # Upload multiple patterns
+            login_failure_attempt_*.png
+            login_error_attempt_*.png
+            critical_error.png
+          retention-days: 7 # Keep artifacts for 7 days
