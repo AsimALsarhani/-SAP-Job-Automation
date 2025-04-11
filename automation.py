@@ -1,4 +1,3 @@
-# automation.py
 import os
 import time
 import logging
@@ -22,16 +21,16 @@ from selenium.webdriver.chrome.options import Options
 # Environment Configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com") # Replace if needed
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza") # Replace if needed
-RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com") # Replace if needed
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")  # Replace if needed
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")  # Replace if needed
+RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")  # Replace if needed
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 
 # Validation Checks
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set")
 if not SAP_USERNAME or not SAP_PASSWORD:
-     logging.warning("SAP_USERNAME or SAP_PASSWORD environment variable not set.")
+    logging.warning("SAP_USERNAME or SAP_PASSWORD environment variable not set.")
 if not all(["@" in email for email in [SENDER_EMAIL, RECIPIENT_EMAIL]]):
     raise ValueError("Invalid email configuration (SENDER_EMAIL or RECIPIENT_EMAIL)")
 
@@ -47,7 +46,7 @@ logging.basicConfig(
 )
 
 def initialize_browser():
-    """Configure Chrome with optimal headless settings"""
+    """Configure Chrome with optimal headless settings."""
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -70,15 +69,14 @@ def initialize_browser():
         logging.error("Ensure ChromeDriver is installed and in the system's PATH.")
         raise
 
-def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
-    """Execute login with robust error handling and retries.
-       Waits for the 'Save' button (scrolling if needed) as confirmation."""
-
-    # --- Using the XPath selector you provided ---
-    # WARNING: IDs like "1291:_saveBtn" might be dynamic. If this fails later,
-    # consider using a contains() XPath like //*[contains(@id, ':_saveBtn')]
-    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]') # <<< --- UPDATED WITH YOUR XPATH
-    # --- ---
+def perform_login(driver, max_retries=3, retry_delay=5):
+    """
+    Execute login with robust error handling and retries.
+    Waits for the 'Save' button (scrolling if needed) as confirmation of a successful login.
+    """
+    # Using the provided XPath selector for the Save button.
+    # Note: If the numeric part is dynamic, consider using: "//*[contains(@id, ':_saveBtn')]"
+    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]')
 
     last_exception = None
 
@@ -91,22 +89,29 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
 
             # Optional: Frame handling
             try:
-                WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID")))
+                WebDriverWait(driver, 10).until(
+                    EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
+                )
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
 
             time.sleep(1)
 
-            # Enter username/password
+            # Enter username
             logging.info("Waiting for username field...")
-            username_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "username")))
+            username_field = WebDriverWait(driver, 90).until(
+                EC.presence_of_element_located((By.ID, "username"))
+            )
             logging.info("Username field found. Sending keys...")
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
 
+            # Enter password
             logging.info("Waiting for password field...")
-            password_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "password")))
+            password_field = WebDriverWait(driver, 90).until(
+                EC.presence_of_element_located((By.ID, "password"))
+            )
             logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
@@ -114,39 +119,41 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
             # Click Sign In button
             logging.info("Waiting for Sign In button...")
             try:
-                sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.ID, "signIn")))
+                sign_in_button = WebDriverWait(driver, 90).until(
+                    EC.element_to_be_clickable((By.ID, "signIn"))
+                )
             except TimeoutException:
                 logging.info("Sign In button not found by ID, trying alternative locator.")
-                sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]")))
+                sign_in_button = WebDriverWait(driver, 90).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]"))
+                )
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(2)
+            time.sleep(2)  # Pause after clicking login
 
-            # --- MODIFIED VERIFICATION WITH SCROLL ---
-            # 1. Wait for the Save button to be PRESENT in the DOM
+            # --- MODIFIED VERIFICATION WITH SCROLLING ---
             logging.info(f"Waiting for Save button presence in DOM using: {SAVE_BUTTON_SELECTOR[1]}")
             wait = WebDriverWait(driver, 90)
             save_button_element = wait.until(
-                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR)
             )
             logging.info("Save button present in DOM.")
 
-            # 2. Scroll the element into view using JavaScript
+            # Scroll the Save button into view
             logging.info("Scrolling Save button into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
             time.sleep(0.5)
 
-            # 3. Now wait for the button to be CLICKABLE
             logging.info("Waiting for Save button to be clickable after scroll...")
             WebDriverWait(driver, 30).until(
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR)
             )
-            logging.info("Save button clickable. Assuming login successful.")
-            # --- END MODIFIED VERIFICATION ---
+            logging.info("Save button is clickable. Assuming login successful.")
+            # --- END MODIFIED VERIFICATION WITH SCROLLING ---
 
-            return # Login presumed successful, exit function
+            return
 
-        except Exception as e: # Catch timeout or other errors during login/verification
+        except Exception as e:
             last_exception = e
             logging.error(f"Login attempt {attempt + 1}/{max_retries} failed: {str(e)}")
             screenshot_filename = f"login_failure_attempt_{attempt + 1}.png"
@@ -155,7 +162,7 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
                 driver.save_screenshot(screenshot_filename)
                 logging.info(f"Screenshot saved: {screenshot_filename}")
             except Exception as screenshot_err:
-                 logging.error(f"Could not save screenshot or get URL: {screenshot_err}")
+                logging.error(f"Could not save screenshot or get URL: {screenshot_err}")
 
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
@@ -164,12 +171,11 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
                 logging.error("Max login retries reached. Raising last encountered error.")
                 raise last_exception
 
-
 def send_report(screenshot_path):
-    """Send email with attachment"""
+    """Send email with attachment."""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
-         logging.error("Sender email or password not configured. Cannot send report.")
-         return
+        logging.error("Sender email or password not configured. Cannot send report.")
+        return
     try:
         msg = EmailMessage()
         msg["Subject"] = "SAP Automation Result"
@@ -189,8 +195,8 @@ def send_report(screenshot_path):
             server.send_message(msg)
         logging.info("Email dispatched successfully")
     except smtplib.SMTPAuthenticationError:
-         logging.error("SMTP Authentication Error: Check sender email/password and App Password if using Gmail.")
-         raise
+        logging.error("SMTP Authentication Error: Check sender email/password and App Password if using Gmail.")
+        raise
     except smtplib.SMTPException as e:
         logging.error(f"Email failure (SMTPException): {str(e)}")
         raise
@@ -198,70 +204,55 @@ def send_report(screenshot_path):
         logging.error(f"General Email failure: {str(e)}")
         raise
 
-
 def main_execution():
-    """Main workflow controller"""
+    """Main workflow controller."""
     driver = None
     wait_time_short = 30  # Standard wait for elements
     wait_time_long = 90   # Longer wait if needed
 
-    # --- Using the XPath selector you provided ---
-    # Ensure this matches the one in perform_login
-    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]') # <<< --- UPDATED WITH YOUR XPATH
-    # --- ---
+    # Use the XPath selector you provided for the Save button.
+    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]')
 
     try:
         driver = initialize_browser()
-
-        # --- Step 1: Perform Login ---
-        # This now waits for the Save button presence, scrolls, waits for clickable
         perform_login(driver)
-
-        # --- Step 2: Actions AFTER successful login ---
         logging.info("Login confirmed (Save button found & clickable), performing post-login actions...")
-        time.sleep(1) # Short pause
+        time.sleep(1)  # Short pause
 
         # --- Action: Click Save button ---
         try:
-            logging.info("Finding Save button again to click...")
-             # Use a short wait just in case, find element, then click
+            logging.info("Re-locating Save button for click action...")
+            # Re-find the save button to avoid stale element issues.
             save_button = WebDriverWait(driver, wait_time_short).until(
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR)
             )
-            logging.info("Clicking Save button...")
-            driver.execute_script("arguments[0].click();", save_button) # JS Click
+            logging.info("Clicking Save button using JavaScript...")
+            driver.execute_script("arguments[0].click();", save_button)
             logging.info("Save button clicked.")
-            time.sleep(2) # Pause after action
+            time.sleep(2)
         except (NoSuchElementException, TimeoutException) as e:
-            logging.warning(f"Could not click the 'Save' button even after login confirmation: {e}")
-            # Consider if this failure should stop the script: raise Exception("Save button failed - Critical Step")
-
+            logging.warning(f"Could not click the 'Save' button after login: {e}")
 
         # --- Action: Click Careers Site link ---
-        # NOTE: Selectors based on recording - MUST BE VERIFIED on actual page!
         try:
             logging.info("Waiting for Careers Site link...")
-            # --- !!! VERIFY/CHANGE THIS SELECTOR based on your page !!! ---
             careers_link_selector = (By.XPATH, "//a[normalize-space()='Careers Site' or @aria-label='Careers Site']")
             careers_link = WebDriverWait(driver, wait_time_short).until(
                 EC.element_to_be_clickable(careers_link_selector)
             )
-            logging.info("Clicking Careers Site link...")
-            careers_link.click()
+            logging.info("Re-locating Careers Site link to avoid stale reference...")
+            # Re-find the element immediately before clicking
+            careers_link = driver.find_element(*careers_link_selector)
+            logging.info("Clicking Careers Site link using JavaScript...")
+            driver.execute_script("arguments[0].click();", careers_link)
             logging.info("Careers Site link clicked.")
-            # --- !! Verify/Adjust this wait condition based on the new page !! ---
-            logging.info("Waiting for potential navigation after clicking Careers Site (e.g., title change)...")
-            WebDriverWait(driver, wait_time_long).until(EC.title_contains("Career")) # Example: Waits for title
+            logging.info("Waiting for potential navigation (title contains 'Career')...")
+            WebDriverWait(driver, wait_time_long).until(EC.title_contains("Career"))
             time.sleep(3)
-        except TimeoutException:
-            logging.warning("Could not find/click 'Careers Site' link or confirm navigation.")
-            # Consider if this failure should stop the script
+        except (TimeoutException, StaleElementReferenceException) as e:
+            logging.warning(f"Error clicking 'Careers Site' link: {e}")
+            raise e
 
-        # --- Action: Other Clicks (Commented Out) ---
-        # logging.info("Performing other recorded clicks...")
-        # ...
-
-        # --- Step 3: Final Actions ---
         logging.info("Post-login actions completed.")
         screenshot_path = "final_state_report.png"
         driver.save_screenshot(screenshot_path)
@@ -276,7 +267,7 @@ def main_execution():
                 driver.save_screenshot("critical_error_main.png")
                 logging.info("Saved critical_error_main.png")
             except Exception as screen_err:
-                 logging.error(f"Could not save critical error screenshot: {screen_err}")
+                logging.error(f"Could not save critical error screenshot: {screen_err}")
         raise
     finally:
         if driver:
