@@ -17,6 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
 
 # Environment Configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
@@ -72,10 +73,10 @@ def initialize_browser():
 def perform_login(driver, max_retries=3, retry_delay=5):
     """
     Execute login with robust error handling and retries.
-    Confirms login by waiting for the 'Save' button (scrolling it into view) to become clickable.
+    Confirms login by waiting for the 'Save' button (scrolling it into view) to be clickable.
+    Uses a flexible XPath to match the Save button.
     """
-    # Use a flexible XPath selector that finds any element whose ID contains ":_saveBtn"
-    # This avoids issues if the numeric part is dynamic.
+    # Flexible selector for the Save button – matches any element whose id contains ":_saveBtn"
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
     last_exception = None
 
@@ -86,7 +87,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             driver.get(SAP_URL)
             time.sleep(2)
 
-            # Optional: Handle frame if necessary.
+            # Optional: handle frame if exists
             try:
                 WebDriverWait(driver, 10).until(
                     EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
@@ -96,8 +97,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 logging.info("No frame found, proceeding without switching.")
 
             time.sleep(1)
-
-            # Enter username.
+            
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "username"))
@@ -105,8 +105,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info("Username field found. Sending keys...")
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
-
-            # Enter password.
+            
             logging.info("Waiting for password field...")
             password_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "password"))
@@ -114,8 +113,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
-
-            # Click Sign In button.
+            
             logging.info("Waiting for Sign In button...")
             try:
                 sign_in_button = WebDriverWait(driver, 90).until(
@@ -129,19 +127,19 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
             time.sleep(2)
-
-            # Verify login by waiting for the Save button.
-            logging.info("Waiting for Save button presence in DOM...")
+            
+            # --- Verification: Wait for Save button ---
+            logging.info("Waiting for Save button presence in DOM using selector: " + SAVE_BUTTON_SELECTOR[1])
             wait = WebDriverWait(driver, 90)
             save_button_element = wait.until(
                 EC.presence_of_element_located(SAVE_BUTTON_SELECTOR)
             )
             logging.info("Save button present in DOM.")
-
+            
             logging.info("Scrolling Save button into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
             time.sleep(0.5)
-
+            
             logging.info("Waiting for Save button to be clickable after scrolling...")
             WebDriverWait(driver, 30).until(
                 EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR)
@@ -167,7 +165,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 raise last_exception
 
 def send_report(screenshot_path):
-    """Send an email with the given screenshot as attachment."""
+    """Send email with attachment."""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         logging.error("Sender email or password not configured. Cannot send report.")
         return
@@ -200,21 +198,21 @@ def send_report(screenshot_path):
         raise
 
 def main_execution():
-    """Main workflow controller."""
+    """Main workflow controller, mimicking recorded steps."""
     driver = None
-    wait_time_short = 30
+    wait_time_short = 60
     wait_time_long = 90
 
-    # Use a flexible XPath for the Save button.
+    # Use flexible XPath for Save button
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
-
+    
     try:
         driver = initialize_browser()
         perform_login(driver)
         logging.info("Login confirmed (Save button found & clickable), performing post-login actions...")
         time.sleep(1)
-
-        # --- Action: Click Save button again ---
+        
+        # --- Step 1: Click Save button again ---
         try:
             logging.info("Re-locating Save button for click action...")
             save_button = WebDriverWait(driver, wait_time_short).until(
@@ -226,14 +224,14 @@ def main_execution():
             time.sleep(2)
         except (NoSuchElementException, TimeoutException) as e:
             logging.warning(f"Could not click the 'Save' button after login: {e}")
-
-        # --- Action: Click Careers Site link with retry logic ---
+        
+        # --- Step 2: Click Careers Site link ---
         try:
             logging.info("Waiting for Careers Site link...")
-            careers_link_selector = (By.XPATH, "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site')]")
+            careers_link_selector = (By.XPATH, "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site')]")
             for attempt in range(3):
                 try:
-                    logging.info(f"Attempt {attempt + 1} to locate and click Careers Site link...")
+                    logging.info(f"Attempt {attempt + 1} to locate Careers Site link...")
                     careers_link = WebDriverWait(driver, wait_time_short).until(
                         EC.element_to_be_clickable(careers_link_selector)
                     )
@@ -243,11 +241,13 @@ def main_execution():
                     logging.info("Clicking Careers Site link using JavaScript...")
                     driver.execute_script("arguments[0].click();", careers_link)
                     logging.info("Careers Site link clicked.")
-                    # Verify navigation by checking title or URL.
+                    # Verify navigation: wait until title or URL contains "career"
                     WebDriverWait(driver, wait_time_long).until(
                         lambda drv: "career" in drv.title.lower() or "career" in drv.current_url.lower()
                     )
-                    logging.info("Navigation to Careers Site successful.")
+                    current_url = driver.current_url
+                    current_title = driver.title
+                    logging.info(f"After clicking Careers Site, URL: {current_url}, Title: {current_title}")
                     break
                 except (TimeoutException, StaleElementReferenceException) as e:
                     logging.warning(f"Attempt {attempt + 1} to click Careers Site link failed: {e}")
@@ -259,12 +259,62 @@ def main_execution():
         except Exception as e:
             logging.error(f"Error clicking Careers Site link: {e}")
             raise
+        
+        # --- Step 3: Click candidate profile area ---
+        try:
+            logging.info("Waiting for candidate profile div (child of #rcmCandidateProfileCtr)...")
+            candidate_div_selector = (By.CSS_SELECTOR, "#rcmCandidateProfileCtr > div:nth-of-type(6)")
+            candidate_div = WebDriverWait(driver, wait_time_short).until(
+                EC.element_to_be_clickable(candidate_div_selector)
+            )
+            logging.info("Clicking candidate profile div using ActionChains with offset (195, 64.78)...")
+            ActionChains(driver).move_to_element_with_offset(candidate_div, 195, 64.78).click().perform()
+            logging.info("Candidate profile div clicked.")
+            time.sleep(2)
+        except Exception as e:
+            logging.warning(f"Error clicking candidate profile div: {e}")
+            raise e
+        
+        # --- Step 4: Right-click on main candidate container ---
+        try:
+            logging.info("Waiting for main candidate container (#rcmCandidateProfileCtr) for right-click...")
+            main_candidate = WebDriverWait(driver, wait_time_short).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#rcmCandidateProfileCtr"))
+            )
+            logging.info("Performing right-click at offset (12, 771.29)...")
+            ActionChains(driver).move_to_element_with_offset(main_candidate, 12, 771.29).context_click().perform()
+            logging.info("Right-click action performed on candidate container.")
+            time.sleep(2)
+        except Exception as e:
+            logging.warning(f"Error performing right-click on candidate container: {e}")
+            raise e
+        
+        # --- Step 5: Left-click on main candidate container at a different offset ---
+        try:
+            logging.info("Performing left-click on candidate container at offset (0, 813.29)...")
+            ActionChains(driver).move_to_element_with_offset(main_candidate, 0, 813.29).click().perform()
+            logging.info("Left-click action performed on candidate container.")
+            time.sleep(2)
+        except Exception as e:
+            logging.warning(f"Error performing left-click on candidate container: {e}")
+            raise e
+
+        # --- Step 6: KeyDown events for 'Control' and 'Shift' ---
+        try:
+            logging.info("Sending keyDown event for 'Control'...")
+            ActionChains(driver).key_down('Control').perform()
+            logging.info("Sending keyDown event for 'Shift'...")
+            ActionChains(driver).key_down('Shift').perform()
+            logging.info("KeyDown events executed.")
+            time.sleep(2)
+        except Exception as e:
+            logging.warning(f"Error sending keyDown events: {e}")
+            raise e
 
         logging.info("Post-login actions completed.")
         screenshot_path = "final_state_report.png"
         driver.save_screenshot(screenshot_path)
         logging.info(f"Final state screenshot captured: {screenshot_path}")
-
         send_report(screenshot_path)
 
     except Exception as e:
