@@ -1,3 +1,4 @@
+# automation.py
 import os
 import time
 import logging
@@ -18,13 +19,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
 
-# --- Existing Configuration and Functions (initialize_browser, send_report) ---
 # Environment Configuration
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
 SAP_PASSWORD = os.environ.get("SAP_PASSWORD")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com")
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza") # Replace if needed
-RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com") # Replace if needed
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "mshtag1990@gmail.com") # Replace default if needed
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza") # Replace default if needed
+RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com") # Replace default if needed
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 
 # Validation Checks
@@ -52,7 +52,7 @@ def initialize_browser():
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920x1080") # Keep window size large
+    options.add_argument("--window-size=1920x1080") # Recorder used 866x774, but larger is usually fine
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-tools")
     options.add_argument("--ignore-certificate-errors")
@@ -70,16 +70,17 @@ def initialize_browser():
         logging.error("Ensure ChromeDriver is installed and in the system's PATH.")
         raise
 
-def perform_login(driver, max_retries=3, retry_delay=5):
+def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
     """Execute login with robust error handling and retries"""
     # --- !! CRITICAL !! ---
     # YOU MUST CHANGE '.login-error-class-name' TO THE *ACTUAL* CSS SELECTOR
     # FOR LOGIN ERROR MESSAGES ON YOUR SAP PORTAL PAGE.
+    # Find this using browser Developer Tools (F12) after a failed login.
     LOGIN_ERROR_SELECTOR = (By.CSS_SELECTOR, ".login-error-class-name") # <<< --- CHANGE THIS SELECTOR
 
     # --- !! CRITICAL !! ---
     # YOU MUST CHANGE '.sap-main-content' TO A *RELIABLE* CSS SELECTOR
-    # FOR AN ELEMENT THAT APPEARS *AFTER* SUCCESSFUL LOGIN. Inspect the page!
+    # FOR AN ELEMENT THAT APPEARS *AFTER* SUCCESSFUL LOGIN. Inspect the page shown in the screenshots!
     LOGIN_SUCCESS_SELECTOR = (By.CSS_SELECTOR, ".sap-main-content") # <<< --- CHANGE THIS SELECTOR (Important!)
 
     last_exception = None
@@ -121,21 +122,22 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             driver.execute_script("arguments[0].click();", sign_in_button)
 
             logging.info("Waiting for post-login verification OR error message...")
-            wait = WebDriverWait(driver, 120)
+            wait = WebDriverWait(driver, 120) # 2 minute wait
             element_found = wait.until(EC.any_of(
                  EC.presence_of_element_located(LOGIN_SUCCESS_SELECTOR), # <<<--- MUST BE CORRECT NOW
-                 EC.presence_of_element_located(LOGIN_ERROR_SELECTOR)
+                 EC.presence_of_element_located(LOGIN_ERROR_SELECTOR)   # <<<--- Needs correct value
             ))
             logging.info("Found either success or error element after wait.")
 
             try:
+                # Try finding the success element first after the wait returns
                 success_element = driver.find_element(*LOGIN_SUCCESS_SELECTOR) # <<<--- MUST BE CORRECT NOW
                 logging.info("Login successful (found success element).")
-                return # Exit function on success
+                return # Successful login, exit function
             except NoSuchElementException:
                  logging.info("Success element not found, checking for error element...")
                  try:
-                      error_element = driver.find_element(*LOGIN_ERROR_SELECTOR)
+                      error_element = driver.find_element(*LOGIN_ERROR_SELECTOR) # <<<--- Needs correct value
                       error_text = error_element.text.strip()
                       logging.error(f"Login error element found with text: '{error_text}'")
                       screenshot_filename = f"login_error_attempt_{attempt + 1}.png"
@@ -210,92 +212,86 @@ def main_execution():
 
     try:
         driver = initialize_browser()
+
+        # --- Step 1: Perform Login (Assumes LOGIN_SUCCESS_SELECTOR is correct!) ---
         perform_login(driver) # Uses default max_retries=3
 
-        logging.info("Login successful, performing post-login actions...")
+        # --- Step 2: Actions AFTER successful login ---
+        logging.info("Login successful, performing post-login actions based on recording...")
         time.sleep(3) # Allow page to settle after login verification
 
-        # --- START: Actions based on recording ---
-
-        # 1. Click Save button (Using text/aria-label is often more robust than dynamic IDs)
-        #    Adjust selector based on actual element (e.g., might be <button> or <input type="button">)
+        # --- Action: Click Save button ---
+        # NOTE: Selectors based on recording - MUST BE VERIFIED on actual page!
+        # Prefer text or aria-label over potentially dynamic IDs like '#1291:_saveBtn'
         try:
             logging.info("Waiting for Save button...")
-            # Try finding by text first, adjust if needed (e.g., "Save Profile", or use aria-label)
-            save_button_selector = (By.XPATH, "//button[normalize-space()='Save']")
-            # Alternative if ID is sometimes stable but dynamic prefix needs handling:
-            # save_button_selector = (By.CSS_SELECTOR, "[id$=':_saveBtn']") # Ends with :_saveBtn
+            # --- !!! VERIFY/CHANGE THIS SELECTOR based on your page !!! ---
+            save_button_selector = (By.XPATH, "//button[normalize-space()='Save' or @aria-label='Save']")
             save_button = WebDriverWait(driver, wait_time_short).until(
                 EC.element_to_be_clickable(save_button_selector)
             )
             logging.info("Clicking Save button...")
             save_button.click()
+            logging.info("Save button clicked.")
             time.sleep(2) # Pause after action
         except TimeoutException:
             logging.warning("Could not find or click the 'Save' button within timeout.")
-            # Decide if this is critical - raise Exception("Save button failed") ?
+            # If Save is mandatory, uncomment the next line:
+            # raise Exception("Save button failed - Critical Step")
 
-        # 2. Click Careers Site link (Using text/aria-label)
+        # --- Action: Click Careers Site link ---
+        # NOTE: Selectors based on recording - MUST BE VERIFIED on actual page!
+        # Prefer text or aria-label over fragile positional selectors like 'p:nth-of-type(8) > a'
         try:
             logging.info("Waiting for Careers Site link...")
-             # Using text content - adjust if link text is different
-            careers_link_selector = (By.XPATH, "//a[normalize-space()='Careers Site']")
+            # --- !!! VERIFY/CHANGE THIS SELECTOR based on your page !!! ---
+            careers_link_selector = (By.XPATH, "//a[normalize-space()='Careers Site' or @aria-label='Careers Site']")
             careers_link = WebDriverWait(driver, wait_time_short).until(
                 EC.element_to_be_clickable(careers_link_selector)
             )
             logging.info("Clicking Careers Site link...")
             careers_link.click()
-            # IMPORTANT: Clicking this link likely navigates away. Subsequent steps
-            # in the recording might be on the *new* page (Careers Site).
-            # Wait for navigation / new page element if necessary
-            logging.info("Waiting for navigation to Careers Site (assuming title change)...")
-            # Example wait: Wait for title containing 'Career' or a specific element on that page
-            WebDriverWait(driver, wait_time_long).until(EC.title_contains("Career")) # Adjust wait condition
+            logging.info("Careers Site link clicked.")
+            # IMPORTANT: This likely navigates away. Add waits for the new page if needed.
+            logging.info("Waiting for potential navigation after clicking Careers Site (e.g., title change)...")
+            # --- !!! VERIFY/ADJUST THIS WAIT CONDITION based on the new page !!! ---
+            WebDriverWait(driver, wait_time_long).until(EC.title_contains("Career")) # Example: Waits for title
             time.sleep(3) # Pause after navigation
         except TimeoutException:
-            logging.warning("Could not find or click the 'Careers Site' link or confirm navigation.")
-            # Decide if this is critical
+            logging.warning("Could not find/click 'Careers Site' link or confirm navigation.")
+            # If navigating here is mandatory, uncomment the next line:
+            # raise Exception("Navigating to Careers Site failed - Critical Step")
 
-        # 3. Other Clicks (Commented out as purpose unclear from recording)
-        # The recording showed clicks within #rcmCandidateProfileCtr - these might
-        # have been accidental or specific interactions not clear from the JSON.
-        # Uncomment and adjust selectors/waits if these actions are necessary.
+        # --- Action: Other Clicks (Commented Out) ---
+        # Purpose unclear from recording, uncomment and verify selectors if needed
+        # logging.info("Performing other recorded clicks...")
         # try:
-        #     logging.info("Performing additional clicks...")
-        #     profile_div_6 = WebDriverWait(driver, wait_time_short).until(
-        #         EC.element_to_be_clickable((By.CSS_SELECTOR, "#rcmCandidateProfileCtr > div:nth-of-type(6)"))
-        #     )
-        #     profile_div_6.click()
+        #     el1 = WebDriverWait(driver, wait_time_short).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#rcmCandidateProfileCtr > div:nth-of-type(6)")))
+        #     el1.click()
         #     time.sleep(1)
-        #
-        #     profile_ctr = WebDriverWait(driver, wait_time_short).until(
-        #         EC.element_to_be_clickable((By.CSS_SELECTOR, "#rcmCandidateProfileCtr"))
-        #     )
-        #     profile_ctr.click() # Or perform specific action needed here
+        #     el2 = WebDriverWait(driver, wait_time_short).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#rcmCandidateProfileCtr")))
+        #     el2.click()
         #     time.sleep(1)
         # except TimeoutException:
-        #     logging.warning("Could not perform additional clicks within profile container.")
+        #      logging.warning("Could not perform other recorded clicks.")
 
-        # --- END: Actions based on recording ---
-
+        # --- Step 3: Final Actions ---
         logging.info("Post-login actions completed.")
-        screenshot_path = "final_state_report.png" # Renamed screenshot
+        screenshot_path = "final_state_report.png"
         driver.save_screenshot(screenshot_path)
         logging.info(f"Final state screenshot captured: {screenshot_path}")
 
-        # Send email only if all steps succeeded
-        send_report(screenshot_path)
+        send_report(screenshot_path) # Send email if successful
 
     except Exception as e:
         logging.error(f"Critical failure in main execution: {str(e)}", exc_info=True)
         if driver:
             try:
-                # Save screenshot with a name indicating critical failure
                 driver.save_screenshot("critical_error_main.png")
                 logging.info("Saved critical_error_main.png")
             except Exception as screen_err:
                  logging.error(f"Could not save critical error screenshot: {screen_err}")
-        raise
+        raise # Re-raise exception to ensure workflow fails
     finally:
         if driver:
             driver.quit()
