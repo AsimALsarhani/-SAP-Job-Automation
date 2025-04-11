@@ -8,7 +8,7 @@ on:
 
 jobs:
   execute-job:
-    runs-on: ubuntu-latest # Using Linux runner
+    runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
@@ -25,7 +25,7 @@ jobs:
       # 3. Install Chrome and Matching ChromeDriver using a dedicated action
       - name: Set up Chrome and ChromeDriver
         uses: browser-actions/setup-chrome@latest
-        id: setup-chrome # Add an ID to potentially reference installed versions if needed
+        id: setup-chrome
 
       # 4. Install required Python packages
       - name: Install Python packages
@@ -47,9 +47,6 @@ jobs:
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
-          # Optional: Pass installed versions to Python if needed
-          # CHROME_VERSION: ${{ steps.setup-chrome.outputs.chrome-version }}
-          # CHROMEDRIVER_VERSION: ${{ steps.setup-chrome.outputs.chromedriver-version }}
         run: |
           echo "--- Verifying Versions ---"
           google-chrome --version
@@ -72,4 +69,4 @@ jobs:
             login_failure_attempt_*.png
             login_error_attempt_*.png
             critical_error.png
-          retention-days: 7 # Keep artifacts for 7 days
+          retention-days: 7
