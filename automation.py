@@ -72,12 +72,13 @@ def initialize_browser():
 def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
     """Execute login with robust error handling and retries"""
     # --- !! CRITICAL !! ---
-    # YOU MUST CHANGE '.login-error-class-name' TO THE *ACTUAL* CSS SELECTOR
+    # CHANGE '.login-error-class-name' TO THE *ACTUAL* CSS SELECTOR
     # FOR LOGIN ERROR MESSAGES ON YOUR SAP PORTAL PAGE.
+    # Find this using browser Developer Tools (F12) after a failed login.
     LOGIN_ERROR_SELECTOR = (By.CSS_SELECTOR, ".login-error-class-name") # <<< --- CHANGE THIS SELECTOR
 
     # --- !! CRITICAL !! ---
-    # YOU MUST CHANGE '.sap-main-content' TO A *RELIABLE* CSS SELECTOR
+    # CHANGE '.sap-main-content' TO A *RELIABLE* CSS SELECTOR
     # FOR AN ELEMENT THAT APPEARS *AFTER* SUCCESSFUL LOGIN. Inspect the page!
     LOGIN_SUCCESS_SELECTOR = (By.CSS_SELECTOR, ".sap-main-content") # <<< --- CHANGE THIS SELECTOR
 
@@ -121,22 +122,18 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
 
             logging.info("Waiting for post-login verification OR error message...")
             wait = WebDriverWait(driver, 120) # 2 minute wait
-            # Wait for EITHER the SUCCESS selector OR the ERROR selector you defined above
             element_found = wait.until(EC.any_of(
                  EC.presence_of_element_located(LOGIN_SUCCESS_SELECTOR), # <<<--- USES THE SELECTOR YOU MUST CHANGE/VERIFY
                  EC.presence_of_element_located(LOGIN_ERROR_SELECTOR)   # <<<--- USES THE SELECTOR YOU MUST CHANGE
             ))
-            logging.info("Found either success or error element after wait.") # Added log
+            logging.info("Found either success or error element after wait.")
 
-            # Check which element was found
             try:
-                # Try finding the success element first after the wait returns
                 success_element = driver.find_element(*LOGIN_SUCCESS_SELECTOR) # <<<--- USES THE SELECTOR YOU MUST CHANGE/VERIFY
                 logging.info("Login successful (found success element).")
-                return # Successful login, exit function
+                return
             except NoSuchElementException:
-                 # Success element wasn't present, check if the error element was
-                 logging.info("Success element not found, checking for error element...") # Added log
+                 logging.info("Success element not found, checking for error element...")
                  try:
                       error_element = driver.find_element(*LOGIN_ERROR_SELECTOR) # <<<--- USES THE SELECTOR YOU MUST CHANGE
                       error_text = error_element.text.strip()
@@ -144,13 +141,9 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
                       screenshot_filename = f"login_error_attempt_{attempt + 1}.png"
                       driver.save_screenshot(screenshot_filename)
                       logging.info(f"Screenshot saved: {screenshot_filename}")
-                      # Raise an exception because login failed
                       raise Exception(f"Login failed. Error element found: {error_text}")
                  except NoSuchElementException:
-                      # This state means EC.any_of returned true, but neither specific element is findable now.
-                      # This might happen if the element appeared briefly and disappeared, or if the state is weird.
                       logging.error("EC.any_of succeeded but couldn't find success or specified error element immediately after.")
-                      # Save screenshot here too for debugging this weird state
                       screenshot_filename = f"login_ambiguous_state_{attempt + 1}.png"
                       driver.save_screenshot(screenshot_filename)
                       logging.info(f"Screenshot saved: {screenshot_filename}")
