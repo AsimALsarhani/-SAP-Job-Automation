@@ -1,3 +1,4 @@
+# automation.py
 import os
 import time
 import logging
@@ -73,8 +74,11 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
     """Execute login with robust error handling and retries.
        Waits for the 'Save' button (scrolling if needed) as confirmation."""
 
-    # --- Selector for the 'Save' button (based on recording, VERIFY THIS!) ---
-    SAVE_BUTTON_SELECTOR = (By.XPATH, "//button[normalize-space()='Save' or @aria-label='Save']") # <<< --- VERIFY THIS SELECTOR
+    # --- Using the XPath selector you provided ---
+    # WARNING: IDs like "1291:_saveBtn" might be dynamic. If this fails later,
+    # consider using a contains() XPath like //*[contains(@id, ':_saveBtn')]
+    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]') # <<< --- UPDATED WITH YOUR XPATH
+    # --- ---
 
     last_exception = None
 
@@ -116,26 +120,26 @@ def perform_login(driver, max_retries=3, retry_delay=5): # Using max_retries=3
                 sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]")))
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(2) # Add a small pause after clicking login
+            time.sleep(2)
 
             # --- MODIFIED VERIFICATION WITH SCROLL ---
-            # 1. Wait for the Save button to be PRESENT in the DOM (even if off-screen)
-            logging.info("Waiting for 'Save' button presence in DOM...")
-            wait = WebDriverWait(driver, 90) # Wait up to 90 seconds for presence
+            # 1. Wait for the Save button to be PRESENT in the DOM
+            logging.info(f"Waiting for Save button presence in DOM using: {SAVE_BUTTON_SELECTOR[1]}")
+            wait = WebDriverWait(driver, 90)
             save_button_element = wait.until(
-                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES THE SELECTOR YOU SHOULD VERIFY
+                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
             )
             logging.info("Save button present in DOM.")
 
             # 2. Scroll the element into view using JavaScript
             logging.info("Scrolling Save button into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
-            time.sleep(0.5) # Short pause to allow rendering after scroll
+            time.sleep(0.5)
 
-            # 3. Now wait for the button to be CLICKABLE (should be visible now)
+            # 3. Now wait for the button to be CLICKABLE
             logging.info("Waiting for Save button to be clickable after scroll...")
-            WebDriverWait(driver, 30).until( # Shorter wait now it should be visible
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES THE SELECTOR YOU SHOULD VERIFY
+            WebDriverWait(driver, 30).until(
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
             )
             logging.info("Save button clickable. Assuming login successful.")
             # --- END MODIFIED VERIFICATION ---
@@ -198,12 +202,13 @@ def send_report(screenshot_path):
 def main_execution():
     """Main workflow controller"""
     driver = None
-    wait_time_short = 30 # Standard wait for elements
-    wait_time_long = 90  # Longer wait if needed
+    wait_time_short = 30  # Standard wait for elements
+    wait_time_long = 90   # Longer wait if needed
 
-    # --- Selector for the 'Save' button (based on recording, VERIFY THIS!) ---
-    # Must match the one used in perform_login
-    SAVE_BUTTON_SELECTOR = (By.XPATH, "//button[normalize-space()='Save' or @aria-label='Save']") # <<< --- VERIFY THIS SELECTOR
+    # --- Using the XPath selector you provided ---
+    # Ensure this matches the one in perform_login
+    SAVE_BUTTON_SELECTOR = (By.XPATH, '//*[@id="1291:_saveBtn"]') # <<< --- UPDATED WITH YOUR XPATH
+    # --- ---
 
     try:
         driver = initialize_browser()
@@ -217,18 +222,14 @@ def main_execution():
         time.sleep(1) # Short pause
 
         # --- Action: Click Save button ---
-        # Since perform_login confirmed it's clickable, we try to click it directly.
-        # Still good practice to wrap in try/except
         try:
             logging.info("Finding Save button again to click...")
              # Use a short wait just in case, find element, then click
             save_button = WebDriverWait(driver, wait_time_short).until(
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES THE SELECTOR YOU SHOULD VERIFY
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
             )
             logging.info("Clicking Save button...")
-            # Use JS Click sometimes helps if button is tricky
-            driver.execute_script("arguments[0].click();", save_button)
-            # save_button.click() # Standard click
+            driver.execute_script("arguments[0].click();", save_button) # JS Click
             logging.info("Save button clicked.")
             time.sleep(2) # Pause after action
         except (NoSuchElementException, TimeoutException) as e:
@@ -237,9 +238,10 @@ def main_execution():
 
 
         # --- Action: Click Careers Site link ---
+        # NOTE: Selectors based on recording - MUST BE VERIFIED on actual page!
         try:
             logging.info("Waiting for Careers Site link...")
-            # --- !! Verify this selector is correct !! ---
+            # --- !!! VERIFY/CHANGE THIS SELECTOR based on your page !!! ---
             careers_link_selector = (By.XPATH, "//a[normalize-space()='Careers Site' or @aria-label='Careers Site']")
             careers_link = WebDriverWait(driver, wait_time_short).until(
                 EC.element_to_be_clickable(careers_link_selector)
