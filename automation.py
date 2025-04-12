@@ -72,8 +72,9 @@ def perform_login(driver, max_retries=3, retry_delay=5):
     Execute login with robust error handling and retries.
     Verifies login by waiting for the 'Save' button (scrolling it into view) to be clickable.
     """
-    # Use a flexible selector for the Save button (matches any id containing ":_saveBtn")
+    # Use a flexible selector for the Save button (matches any element whose id contains ":_saveBtn")
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
+    # Use an updated selector for the Sign In button based on ARIA/text.
     SIGN_IN_BUTTON_SELECTOR = (By.XPATH, "//button[@aria-label='Sign In' or normalize-space()='Sign In']")
     
     last_exception = None
@@ -82,8 +83,8 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
             driver.get(SAP_URL)
             time.sleep(2)
-
-            # Optional: Handle iframe if needed.
+            
+            # If needed, switch to iframe
             try:
                 WebDriverWait(driver, 10).until(
                     EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID"))
@@ -92,44 +93,49 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
             time.sleep(1)
-
-            # Enter credentials
+            
+            # Enter username
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "username"))
             )
+            logging.info("Username field found. Sending keys...")
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
-
+            
+            # Enter password
             logging.info("Waiting for password field...")
             password_field = WebDriverWait(driver, 90).until(
                 EC.presence_of_element_located((By.ID, "password"))
             )
+            logging.info("Password field found. Sending keys.")
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
-
-            # Click Sign In button
+            
+            # Click the Sign In button
             logging.info("Waiting for Sign In button...")
             sign_in_button = WebDriverWait(driver, 90).until(
                 EC.element_to_be_clickable(SIGN_IN_BUTTON_SELECTOR)
             )
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(3)
-
-            # Scroll down to load dynamic content
+            time.sleep(3)  # Wait for login process to proceed
+            
+            # Scroll down for dynamic content to load
             logging.info("Scrolling to bottom of page...")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(1)
-
-            # Wait for Save button to appear
-            logging.info(f"Waiting for Save button presence in DOM using selector: {SAVE_BUTTON_SELECTOR[1]}")
+            
+            # Verify successful login by waiting for the Save button
+            logging.info("Waiting for Save button presence in DOM using selector: " + SAVE_BUTTON_SELECTOR[1])
             wait = WebDriverWait(driver, 120)
             save_button_element = wait.until(EC.presence_of_element_located(SAVE_BUTTON_SELECTOR))
             logging.info("Save button present in DOM.")
+            
             logging.info("Scrolling Save button into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
             time.sleep(0.5)
+            
             logging.info("Waiting for Save button to be clickable after scrolling...")
             WebDriverWait(driver, 30).until(EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR))
             logging.info("Save button is clickable. Login assumed successful.")
@@ -140,6 +146,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             try:
                 logging.error(f"Current URL on failure: {driver.current_url}")
                 driver.save_screenshot(f"login_failure_attempt_{attempt + 1}.png")
+                logging.info(f"Screenshot saved: login_failure_attempt_{attempt + 1}.png")
             except Exception as se:
                 logging.error(f"Error saving screenshot: {se}")
             if attempt < max_retries - 1:
@@ -150,7 +157,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 raise last_exception
 
 def send_report(screenshot_path):
-    """Send an email report with the given screenshot as an attachment."""
+    """Send email report with the final screenshot attached."""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         logging.error("Sender email or password not configured. Cannot send report.")
         return
@@ -159,7 +166,7 @@ def send_report(screenshot_path):
         msg["Subject"] = "SAP Automation Result"
         msg["From"] = SENDER_EMAIL
         msg["To"] = RECIPIENT_EMAIL
-        msg.set_content("Process completed. See attached post-run screenshot proof.")
+        msg.set_content("Process completed. See attached post-run proof screenshot.")
         with open(screenshot_path, "rb") as f:
             msg.add_attachment(f.read(), maintype="image", subtype="png", filename="post_run_proof.png")
         logging.info(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")
@@ -182,16 +189,16 @@ def main_execution():
     wait_time_short = 60
     wait_time_long = 120
 
-    # Flexible selector for Save button (for login verification)
+    # Use a flexible selector for the Save button for login verification.
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
-
+    
     try:
         driver = initialize_browser()
         perform_login(driver)
         logging.info("Login confirmed. Proceeding with post-login actions...")
         time.sleep(1)
-
-        # Step 1: Click Save button again
+        
+        # Step 1: Click the Save button again
         try:
             logging.info("Re-locating Save button for post-login click...")
             save_button = WebDriverWait(driver, wait_time_short).until(
@@ -205,7 +212,7 @@ def main_execution():
             logging.error(f"Failed to click the Save button: {e}")
             driver.save_screenshot("save_button_click_error.png")
             raise
-
+        
         # Step 2: Click inside the main profile container
         try:
             logging.info("Waiting for the main profile container (#rcmCandidateProfileCtr)...")
@@ -223,13 +230,17 @@ def main_execution():
             logging.error(f"Failed to click the profile container: {e}")
             driver.save_screenshot("profile_container_click_error.png")
             raise
-
-        # Step 7: Take final screenshot as post-run proof
-        logging.info("Taking final screenshot for post-run proof...")
+        
+        # Step 7: Zoom out before taking the final screenshot.
+        logging.info("Zooming out to capture a wider view...")
+        driver.execute_script("document.body.style.zoom='80%'")
+        time.sleep(1)  # Allow time for the zoom to take effect
+        
+        # Step 7: Take final screenshot as post-run proof.
         final_screenshot = "post_run_proof.png"
         driver.save_screenshot(final_screenshot)
         logging.info(f"Final screenshot saved as {final_screenshot}")
-
+        
         send_report(final_screenshot)
 
     except Exception as e:
