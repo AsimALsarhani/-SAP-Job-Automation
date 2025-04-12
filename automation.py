@@ -19,7 +19,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys # Import Keys
+from selenium.webdriver.common.keys import Keys
 
 # Environment Configuration (Keep as is)
 SAP_USERNAME = os.environ.get("SAP_USERNAME")
@@ -72,21 +72,38 @@ def initialize_browser():
         logging.error("Ensure ChromeDriver is installed and in the system's PATH.")
         raise
 
-# perform_login() function (Updated with page scroll)
+# perform_login() function (Updated Save selectors and cookie clearing)
 def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling and retries.
-       Scrolls page down, then waits for 'Save' button as confirmation."""
+       Scrolls page down, then tries multiple selectors for 'Save' button."""
 
-    # --- Using the Absolute XPath selector you provided ---
-    # !! WARNING: This selector is very fragile and likely to break !!
-    SAVE_BUTTON_SELECTOR = (By.XPATH, '/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span') # <<< --- Using your XPath
+    # --- List of potential selectors for the Save button ---
+    # We will try these in order. Add/remove/reorder as needed.
+    # It's BEST if YOU find the correct one using Dev Tools.
+    possible_save_selectors = [
+        (By.XPATH, "//*[contains(@id, 'saveBtn') and contains(@id, ':')]"), # Contains ':saveBtn' (more flexible ID)
+        (By.XPATH, "//button[normalize-space()='Save']"), # Button with exact text 'Save'
+        (By.XPATH, "//button[contains(normalize-space(),'Save')]"), # Button containing text 'Save'
+        (By.XPATH, "//button[@aria-label='Save']"), # Button with aria-label 'Save'
+        # (By.XPATH, '/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span') # Your original fragile XPath (last resort)
+    ]
     # --- ---
 
     last_exception = None
+    login_verified = False # Flag to check if verification succeeded
 
     for attempt in range(max_retries):
+        login_verified = False # Reset flag for each attempt
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
+
+            # --- Clear Cookies and Navigate on Retries ---
+            if attempt > 0:
+                logging.info("Clearing cookies before retry...")
+                driver.delete_all_cookies()
+                time.sleep(1) # Short pause after clearing cookies
+            # --- End Clear Cookies ---
+
             logging.info("Navigating to SAP URL...")
             driver.get(SAP_URL)
             time.sleep(2)
@@ -97,7 +114,6 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
-
             time.sleep(1)
 
             # Enter username/password
@@ -122,38 +138,52 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]")))
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(3) # Increase pause slightly after login click
+            time.sleep(3)
 
             # --- Scroll Page Down Before Checking for Button ---
             logging.info("Attempting to scroll to page bottom...")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1) # Allow time for any lazy loading triggered by scroll
-            logging.info("Scrolled to bottom. Now proceeding with Save button check...")
+            time.sleep(1)
+            logging.info("Scrolled to bottom. Now checking for Save button...")
             # --- End Scroll Page Down ---
 
-            # --- VERIFICATION STEPS (After Page Scroll) ---
-            # 1. Wait for the Save button to be PRESENT in the DOM
-            logging.info(f"Waiting for Save element presence in DOM using: {SAVE_BUTTON_SELECTOR[1]}")
-            wait = WebDriverWait(driver, 90) # Still wait up to 90s for presence
-            save_button_element = wait.until(
-                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR XPATH
-            )
-            logging.info("Save element present in DOM.")
+            # --- Try Multiple Selectors for Save Button ---
+            wait_presence = WebDriverWait(driver, 60) # Wait slightly less for presence now page is scrolled
+            wait_clickable = WebDriverWait(driver, 30) # Shorter wait for clickable
 
-            # 2. Scroll the specific element into view (might be redundant now, but safe)
-            logging.info("Scrolling Save element specifically into view...")
-            driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
-            time.sleep(0.5)
+            found_working_selector = None
+            for selector_tuple in possible_save_selectors:
+                selector_method, selector_value = selector_tuple
+                try:
+                    logging.info(f"Trying Save selector: {selector_method} -> {selector_value}")
+                    # 1. Wait for Presence
+                    save_button_element = wait_presence.until(
+                        EC.presence_of_element_located(selector_tuple)
+                    )
+                    logging.info("-> Present in DOM.")
+                    # 2. Scroll into view (might be redundant but safe)
+                    driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
+                    time.sleep(0.5)
+                    # 3. Wait for Clickable
+                    wait_clickable.until(
+                        EC.element_to_be_clickable(selector_tuple)
+                    )
+                    logging.info("-> Clickable. Assuming login successful with this selector.")
+                    found_working_selector = selector_tuple # Store the one that worked
+                    login_verified = True # Set flag
+                    break # Exit selector loop
+                except TimeoutException:
+                    logging.info("-> Selector failed (timeout).")
+                    continue # Try next selector
 
-            # 3. Now wait for the button to be CLICKABLE
-            logging.info("Waiting for Save element to be clickable after scroll...")
-            WebDriverWait(driver, 30).until( # Shorter wait now it should be visible
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR XPATH
-            )
-            logging.info("Save element clickable. Assuming login successful.")
-            # --- END VERIFICATION STEPS ---
+            if not login_verified:
+                # If loop finished and login wasn't verified
+                raise TimeoutException("Could not find or verify Save button using any known selector after login.")
+            # --- End Try Multiple Selectors ---
 
-            return # Login presumed successful, exit function
+            # If we get here, login_verified must be true
+            logging.info(f"Login confirmed using selector: {found_working_selector}")
+            return # Login successful
 
         except Exception as e:
             last_exception = e
@@ -169,6 +199,7 @@ def perform_login(driver, max_retries=3, retry_delay=5):
             if attempt < max_retries - 1:
                 logging.info(f"Retrying login in {retry_delay} seconds...")
                 time.sleep(retry_delay)
+                 # Cookie clearing happens at the start of the next loop iteration
             else:
                 logging.error("Max login retries reached. Raising last encountered error.")
                 raise last_exception
@@ -207,80 +238,99 @@ def send_report(screenshot_path):
         logging.error(f"General Email failure: {str(e)}")
         raise
 
-# main_execution() function (Using your absolute XPath for Save button)
+# main_execution() function (No changes needed here now)
 def main_execution():
     """Main workflow controller."""
     driver = None
     wait_time_short = 60
     wait_time_long = 120
 
-    # --- Using the Absolute XPath selector you provided ---
-    # !! WARNING: This selector is very fragile !!
-    SAVE_BUTTON_SELECTOR = (By.XPATH, '/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span') # <<< --- UPDATED WITH YOUR XPATH
-    # --- ---
+    # --- Define selectors once ---
+    # This selector MUST match one that successfully works in perform_login verification
+    SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]") # Using flexible one by default, adjust if needed based on logs
 
-    # --- Selector for Careers Link (Verify this is correct for your page!) ---
-    CAREERS_LINK_SELECTOR = (By.XPATH, "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site')]") # <<<--- MUST VERIFY AND CHANGE IF INCORRECT !!!
-    # --- ---
+    # --- Verify this selector! ---
+    CAREERS_LINK_SELECTOR = (By.XPATH, "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'careers site')]")
 
-    CANDIDATE_DIV_SELECTOR = (By.CSS_SELECTOR, "#rcmCandidateProfileCtr > div:nth-of-type(6)") # Verify if needed
-    MAIN_CANDIDATE_SELECTOR = (By.CSS_SELECTOR, "#rcmCandidateProfileCtr") # Verify if needed
+    CANDIDATE_DIV_SELECTOR = (By.CSS_SELECTOR, "#rcmCandidateProfileCtr > div:nth-of-type(6)")
+    MAIN_CANDIDATE_SELECTOR = (By.CSS_SELECTOR, "#rcmCandidateProfileCtr")
 
     try:
         driver = initialize_browser()
-        perform_login(driver) # Uses the updated SAVE_BUTTON_SELECTOR internally
+        perform_login(driver) # Login verification happens internally now
         logging.info("Login confirmed, performing post-login actions...")
         time.sleep(1)
 
-        # --- Action: Click Save button/element ---
+        # --- Action: Click Save button ---
         try:
-            logging.info("Finding Save element again to click...")
-            # We wait for clickable again here just to be sure before clicking
+            logging.info("Finding Save button again to click...")
             save_button = WebDriverWait(driver, wait_time_short).until(
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # Use the verified selector
             )
-            logging.info("Clicking Save element using JavaScript...")
+            logging.info("Clicking Save button using JavaScript...")
             driver.execute_script("arguments[0].click();", save_button)
-            logging.info("Save element clicked.")
+            logging.info("Save button clicked.")
             time.sleep(2)
         except Exception as e:
-            logging.error(f"Could not click the 'Save' element after login confirmation: {e}", exc_info=True)
+            logging.error(f"Could not click the 'Save' button after login confirmation: {e}", exc_info=True)
             driver.save_screenshot("save_button_click_error.png")
             raise
 
         # --- Action: Click Careers Site link ---
-        # (This part still needs verification of its selector)
-        try:
-            logging.info("Waiting for Careers Site link...")
-            logging.info(f"Waiting for link with selector: {CAREERS_LINK_SELECTOR[1]}")
-            careers_link = WebDriverWait(driver, wait_time_short).until(
-                EC.element_to_be_clickable(CAREERS_LINK_SELECTOR) # <<< --- VERIFY THIS SELECTOR
-            )
-            logging.info("Careers link located.")
-            logging.info("Scrolling Careers Site link into view...")
-            driver.execute_script("arguments[0].scrollIntoView(true);", careers_link)
-            time.sleep(0.5)
-            logging.info("Attempting to click Careers Site link using JavaScript...")
-            driver.execute_script("arguments[0].click();", careers_link)
-            logging.info("JS click executed for Careers Site link.")
-            time.sleep(1)
-            current_url = driver.current_url
-            current_title = driver.title
-            logging.info(f"Immediately after click: URL = {current_url}, Title = {current_title}")
-            logging.info("Waiting for navigation confirmation (title contains 'Career')...")
-            WebDriverWait(driver, wait_time_long).until(
-                lambda drv: "career" in drv.title.lower()
-            )
-            logging.info("Navigation to Careers Site confirmed by title.")
-        except Exception as e:
-            logging.warning(f"Could not find/click 'Careers Site' link or confirm navigation: {e}", exc_info=True)
-            driver.save_screenshot("careers_site_click_error.png")
-            # Decide if this is critical, raise e?
+        careers_clicked = False
+        for attempt in range(3):
+            try:
+                logging.info(f"Attempt {attempt + 1}/3 to find and click Careers Site link...")
+                logging.info(f"Waiting for link with selector: {CAREERS_LINK_SELECTOR[1]}")
+                pre_careers_click_screenshot = f"careers_site_before_click_attempt_{attempt + 1}.png"
+                driver.save_screenshot(pre_careers_click_screenshot)
+                logging.info(f"Saved screenshot: {pre_careers_click_screenshot}")
 
-        # --- Other recorded actions (Commented out, verify if needed) ---
-        # ... (ActionChains code remains commented) ...
+                careers_link = WebDriverWait(driver, wait_time_short).until(
+                    EC.element_to_be_clickable(CAREERS_LINK_SELECTOR)
+                )
+                logging.info("Careers link located.")
+                logging.info("Scrolling Careers Site link into view...")
+                driver.execute_script("arguments[0].scrollIntoView(true);", careers_link)
+                time.sleep(0.5)
 
-        # --- Step 3: Final Actions ---
+                logging.info("Attempting to click Careers Site link using JavaScript...")
+                driver.execute_script("arguments[0].click();", careers_link)
+                logging.info("JS click executed for Careers Site link.")
+                time.sleep(1)
+
+                current_url = driver.current_url
+                current_title = driver.title
+                logging.info(f"Immediately after click: URL = {current_url}, Title = {current_title}")
+
+                logging.info("Waiting for navigation confirmation (title contains 'Career')...")
+                WebDriverWait(driver, wait_time_long).until(
+                    lambda drv: "career" in drv.title.lower()
+                )
+                logging.info("Navigation to Careers Site confirmed by title.")
+                careers_clicked = True
+                break
+            except Exception as e:
+                logging.warning(f"Attempt {attempt + 1}/3 to click Careers Site link failed: {e}")
+                post_careers_click_screenshot = f"careers_site_click_error_attempt_{attempt + 1}.png"
+                try:
+                    driver.save_screenshot(post_careers_click_screenshot)
+                    logging.info(f"Saved error screenshot: {post_careers_click_screenshot}")
+                except Exception as screen_err:
+                    logging.error(f"Could not save screenshot on careers click error: {screen_err}")
+                if attempt < 2:
+                    logging.info("Waiting before retry...")
+                    time.sleep(5)
+                else:
+                    logging.error("All attempts to locate and click Careers Site link failed.")
+                    raise
+        if not careers_clicked:
+             raise Exception("Critical step failed: Could not click Careers Site link.")
+
+        # --- Other Actions (Commented Out) ---
+        # ...
+
+        # --- Final Actions ---
         logging.info("Post-login actions seemingly completed.")
         screenshot_path = "final_state_report.png"
         driver.save_screenshot(screenshot_path)
