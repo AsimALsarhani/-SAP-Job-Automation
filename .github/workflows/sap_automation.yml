@@ -59,7 +59,7 @@ jobs:
           set +x
           echo "---------------------------"
 
-      # 6. Upload screenshots on failure
+      # 6. Upload failure screenshots on error
       - name: Upload failure screenshots
         if: failure() # Only run this step if the workflow failed
         uses: actions/upload-artifact@v4
@@ -68,5 +68,9 @@ jobs:
           path: | # Upload multiple patterns
             login_failure_attempt_*.png
             login_error_attempt_*.png
-            critical_error.png
+            login_ambiguous_state_*.png
+            critical_error_main.png   # <<<--- CORRECTED FILENAME HERE
+            careers_site_click_error.png # Added potential new screenshot
+            final_state_report.png    # Upload final state if it gets that far before error
           retention-days: 7
+          if-no-files-found: warn # Keep warning if some files don't exist
