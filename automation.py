@@ -72,15 +72,14 @@ def initialize_browser():
         logging.error("Ensure ChromeDriver is installed and in the system's PATH.")
         raise
 
-# perform_login() function (Updated SAVE_BUTTON_SELECTOR)
+# perform_login() function (Updated with page scroll)
 def perform_login(driver, max_retries=3, retry_delay=5):
     """Execute login with robust error handling and retries.
-       Waits for the 'Save' button (scrolling if needed) as confirmation."""
+       Scrolls page down, then waits for 'Save' button as confirmation."""
 
     # --- Using the Absolute XPath selector you provided ---
-    # !! WARNING: This selector is very fragile and likely to break if the page structure changes even slightly !!
-    # !! Consider finding a more stable selector using ID, Class, Text, or Aria-label if possible !!
-    SAVE_BUTTON_SELECTOR = (By.XPATH, '/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span') # <<< --- UPDATED WITH YOUR XPATH
+    # !! WARNING: This selector is very fragile and likely to break !!
+    SAVE_BUTTON_SELECTOR = (By.XPATH, '/html/body/as:ajaxinclude/as:ajaxinclude/div[2]/div[2]/div/form/div[3]/div[2]/div[1]/div[23]/div/span') # <<< --- Using your XPath
     # --- ---
 
     last_exception = None
@@ -123,26 +122,36 @@ def perform_login(driver, max_retries=3, retry_delay=5):
                 sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Sign In')]")))
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
-            time.sleep(2)
+            time.sleep(3) # Increase pause slightly after login click
 
-            # --- MODIFIED VERIFICATION WITH SCROLL (Using your XPath) ---
+            # --- Scroll Page Down Before Checking for Button ---
+            logging.info("Attempting to scroll to page bottom...")
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1) # Allow time for any lazy loading triggered by scroll
+            logging.info("Scrolled to bottom. Now proceeding with Save button check...")
+            # --- End Scroll Page Down ---
+
+            # --- VERIFICATION STEPS (After Page Scroll) ---
+            # 1. Wait for the Save button to be PRESENT in the DOM
             logging.info(f"Waiting for Save element presence in DOM using: {SAVE_BUTTON_SELECTOR[1]}")
-            wait = WebDriverWait(driver, 90)
+            wait = WebDriverWait(driver, 90) # Still wait up to 90s for presence
             save_button_element = wait.until(
-                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+                EC.presence_of_element_located(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR XPATH
             )
             logging.info("Save element present in DOM.")
 
-            logging.info("Scrolling Save element into view...")
+            # 2. Scroll the specific element into view (might be redundant now, but safe)
+            logging.info("Scrolling Save element specifically into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
             time.sleep(0.5)
 
+            # 3. Now wait for the button to be CLICKABLE
             logging.info("Waiting for Save element to be clickable after scroll...")
-            WebDriverWait(driver, 30).until(
-                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
+            WebDriverWait(driver, 30).until( # Shorter wait now it should be visible
+                EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR XPATH
             )
             logging.info("Save element clickable. Assuming login successful.")
-            # --- END MODIFIED VERIFICATION ---
+            # --- END VERIFICATION STEPS ---
 
             return # Login presumed successful, exit function
 
@@ -198,7 +207,7 @@ def send_report(screenshot_path):
         logging.error(f"General Email failure: {str(e)}")
         raise
 
-# main_execution() function (Updated SAVE_BUTTON_SELECTOR)
+# main_execution() function (Using your absolute XPath for Save button)
 def main_execution():
     """Main workflow controller."""
     driver = None
@@ -226,6 +235,7 @@ def main_execution():
         # --- Action: Click Save button/element ---
         try:
             logging.info("Finding Save element again to click...")
+            # We wait for clickable again here just to be sure before clicking
             save_button = WebDriverWait(driver, wait_time_short).until(
                 EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR) # <<< --- USES YOUR UPDATED XPATH
             )
@@ -262,13 +272,13 @@ def main_execution():
                 lambda drv: "career" in drv.title.lower()
             )
             logging.info("Navigation to Careers Site confirmed by title.")
-        except Exception as e: # Catch broader exception here
+        except Exception as e:
             logging.warning(f"Could not find/click 'Careers Site' link or confirm navigation: {e}", exc_info=True)
             driver.save_screenshot("careers_site_click_error.png")
             # Decide if this is critical, raise e?
 
         # --- Other recorded actions (Commented out, verify if needed) ---
-        # ...
+        # ... (ActionChains code remains commented) ...
 
         # --- Step 3: Final Actions ---
         logging.info("Post-login actions seemingly completed.")
