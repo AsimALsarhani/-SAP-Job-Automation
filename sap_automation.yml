@@ -1,0 +1,76 @@
+# .github/workflows/sap_automation.yml
+name: SAP Automation
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # Hourly execution
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  execute-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python environment
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. Install Chrome and Matching ChromeDriver using a dedicated action
+      - name: Set up Chrome and ChromeDriver
+        uses: browser-actions/setup-chrome@latest
+        id: setup-chrome
+
+      # 4. Install required Python packages
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+             pip install -r requirements.txt
+          else
+             echo "requirements.txt not found, installing selenium directly"
+             pip install selenium
+          fi
+
+      # 5. Run the automation script
+      - name: Run Automation
+        env:
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SAP_URL: ${{ secrets.SAP_URL }}
+        run: |
+          echo "--- Verifying Versions ---"
+          google-chrome --version
+          chromedriver --version
+          echo "--------------------------"
+
+          echo "--- Running Python Script ---"
+          set -x
+          python automation.py || { echo 'Automation script failed'; exit 1; }
+          set +x
+          echo "---------------------------"
+
+      # 6. Upload failure screenshots on error
+      - name: Upload failure screenshots
+        if: failure() # Only run this step if the workflow failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots
+          path: | # Upload multiple patterns
+            login_failure_attempt_*.png
+            login_error_attempt_*.png
+            login_ambiguous_state_*.png
+            critical_error_main.png   # <<<--- CORRECTED FILENAME HERE
+            careers_site_click_error.png # Added potential new screenshot
+            final_state_report.png    # Upload final state if it gets that far before error
+          retention-days: 7
+          if-no-files-found: warn # Keep warning if some files don't exist

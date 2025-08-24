@@ -25,6 +25,12 @@ SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "cnfz gnxd icab odza")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "asimalsarhani@gmail.com")
 SAP_URL = os.environ.get("SAP_URL")  # Mandatory
 
+# New: Profile URL from the recorded steps (can be overridden by env)
+PROFILE_URL = os.environ.get(
+    "PROFILE_URL",
+    "https://career23.sapsf.com/portalcareer?company=saudiara05&rcm%5fsite%5flocale=en%5fUS&&navBarLevel=MY_PROFILE&_s.crb=fSK8FjvyuLvpZoqKAuazSSf8QRrC9X5nQeXmiHRGjB4%253d",
+)
+
 # Validation Checks
 if not SAP_URL:
     raise ValueError("SAP_URL environment variable must be set")
@@ -72,54 +78,51 @@ def perform_login(driver, max_retries=3, retry_delay=5):
     Execute login with robust error handling and retries.
     Verifies successful login by scrolling the 'Save' button into view and ensuring it is clickable.
     """
-    # Use a flexible selector for the Save button.
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
     SIGN_IN_BUTTON_SELECTOR = (By.XPATH, "//button[@aria-label='Sign In' or normalize-space()='Sign In']")
-    
+
     last_exception = None
     for attempt in range(max_retries):
         try:
             logging.info(f"Login attempt: {attempt + 1}/{max_retries}")
             driver.get(SAP_URL)
             time.sleep(2)
-            
-            # Optional: handle frame if needed.
             try:
                 WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "frameID")))
                 logging.info("Switched to frame (if present).")
             except TimeoutException:
                 logging.info("No frame found, proceeding without switching.")
             time.sleep(1)
-            
+
             logging.info("Waiting for username field...")
             username_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "username")))
             username_field.clear()
             username_field.send_keys(SAP_USERNAME)
-            
+
             logging.info("Waiting for password field...")
             password_field = WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "password")))
             password_field.clear()
             password_field.send_keys(SAP_PASSWORD)
-            
+
             logging.info("Waiting for Sign In button...")
             sign_in_button = WebDriverWait(driver, 90).until(EC.element_to_be_clickable(SIGN_IN_BUTTON_SELECTOR))
             logging.info("Sign In button found. Clicking.")
             driver.execute_script("arguments[0].click();", sign_in_button)
             time.sleep(3)
-            
+
             logging.info("Scrolling to bottom of the page...")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(1)
-            
+
             logging.info("Waiting for Save button presence using selector: " + SAVE_BUTTON_SELECTOR[1])
             wait = WebDriverWait(driver, 120)
             save_button_element = wait.until(EC.presence_of_element_located(SAVE_BUTTON_SELECTOR))
             logging.info("Save button present in DOM.")
-            
+
             logging.info("Scrolling Save button into view...")
             driver.execute_script("arguments[0].scrollIntoView(true);", save_button_element)
             time.sleep(0.5)
-            
+
             logging.info("Waiting for Save button to be clickable after scrolling...")
             WebDriverWait(driver, 30).until(EC.element_to_be_clickable(SAVE_BUTTON_SELECTOR))
             logging.info("Save button is clickable. Login assumed successful.")
@@ -167,22 +170,87 @@ def send_report(screenshot_path):
         logging.error(f"Failed to send report: {e}")
         raise
 
+def perform_profile_update(driver, first_name_value: str = "Asim", url: str = PROFILE_URL) -> None:
+    """
+    Navigate to the candidate profile page and perform recorded interactions:
+      1) Navigate to PROFILE_URL
+      2) Click expand/collapse (id contains ':_expandCollapse')
+      3) Open 'Profile Information' tab
+      4) Set 'First Name' (data-testid='sfTextField') to provided value
+      5) Click 'Save'
+    """
+    logging.info("=== START profile_update (recorded steps) ===")
+    logging.info(f"Navigating to candidate profile page …")
+    driver.get(url)
+    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+    time.sleep(1)
+
+    # Expand/Collapse
+    try:
+        logging.info("Expanding section (:_expandCollapse)…")
+        toggle = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[contains(@id, ':_expandCollapse')]"))
+        )
+        driver.execute_script("arguments[0].click();", toggle)
+        time.sleep(1)
+    except Exception as e:
+        logging.info(f"Expand/collapse not found or not needed: {e}")
+
+    # Open Profile Information
+    try:
+        logging.info("Opening 'Profile Information' tab…")
+        try:
+            tab = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//*[@id and contains(., 'Profile Information')]"))
+            )
+        except TimeoutException:
+            tab = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//*[normalize-space()='Profile Information']"))
+            )
+        driver.execute_script("arguments[0].click();", tab)
+        time.sleep(1)
+    except Exception as e:
+        logging.info(f"'Profile Information' tab not interactable: {e}")
+
+    # Set First Name
+    try:
+        logging.info(f"Typing first name value: {first_name_value}")
+        first_name_input = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, "//*[@data-testid='sfTextField']"))
+        )
+        driver.execute_script("arguments[0].scrollIntoView(true);", first_name_input)
+        time.sleep(0.3)
+        first_name_input.clear()
+        first_name_input.send_keys(first_name_value)
+        time.sleep(0.3)
+    except Exception as e:
+        logging.warning(f"Could not set first name: {e}")
+
+    # Save
+    try:
+        logging.info("Clicking Save (profile update)…")
+        save_btn = WebDriverWait(driver, 30).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[contains(@id, ':_saveBtn') or @aria-label='Save' or normalize-space()='Save']"))
+        )
+        driver.execute_script("arguments[0].click();", save_btn)
+        time.sleep(2)
+    except Exception as e:
+        logging.warning(f"Save button not found/clickable on profile page: {e}")
+
 def main_execution():
     """Main workflow controller following new recorded steps."""
     driver = None
     wait_time_short = 60
-    wait_time_long = 120
 
-    # Use flexible selector for Save button for login verification.
     SAVE_BUTTON_SELECTOR = (By.XPATH, "//*[contains(@id, ':_saveBtn')]")
-    
+
     try:
         driver = initialize_browser()
         perform_login(driver)
         logging.info("Login confirmed. Proceeding with post-login actions...")
         time.sleep(1)
-        
-        # Step 1: Click Save button again
+
+        # Original post-login click (kept for stability)
         try:
             logging.info("Re-locating Save button for post-login click...")
             save_button = WebDriverWait(driver, wait_time_short).until(
@@ -195,9 +263,11 @@ def main_execution():
         except Exception as e:
             logging.error(f"Failed to click the Save button: {e}")
             driver.save_screenshot("save_button_click_error.png")
-            raise
-        
-        # Step 2: Click inside the main profile container
+
+        # New: perform the recorded profile update steps
+        perform_profile_update(driver, first_name_value="Asim", url=PROFILE_URL)
+
+        # Click inside the main profile container (original step)
         try:
             logging.info("Waiting for the main profile container (#rcmCandidateProfileCtr)...")
             profile_container = WebDriverWait(driver, wait_time_short).until(
@@ -213,18 +283,16 @@ def main_execution():
         except Exception as e:
             logging.error(f"Failed to click the profile container: {e}")
             driver.save_screenshot("profile_container_click_error.png")
-            raise
-        
-        # Step 7: Zoom out before taking the final screenshot
+
+        # Zoom out and screenshot
         logging.info("Zooming out to capture a broader view (set zoom to 50%)...")
         driver.execute_script("document.body.style.zoom='50%'")
         time.sleep(1)
-        
-        # Step 7: Take final screenshot as post-run proof
+
         final_screenshot = "post_run_proof.png"
         driver.save_screenshot(final_screenshot)
         logging.info(f"Final screenshot saved as {final_screenshot}")
-        
+
         send_report(final_screenshot)
 
     except Exception as e:

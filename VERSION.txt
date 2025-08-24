@@ -1,0 +1,2 @@
+Build: 2025-08-24 21:29:35 +0300
+Changes: integrated recorded profile update steps (perform_profile_update), PROFILE_URL env var, banner logs.
