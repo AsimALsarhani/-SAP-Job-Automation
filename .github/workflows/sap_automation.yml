@@ -3,10 +3,8 @@ name: SAP Automation (stable + diagnostics)
 on:
   workflow_dispatch:
   schedule:
-    # Keep your schedule; example below runs hourly at minute 10
-    - cron: "10 * * * *"
+    - cron: "10 * * * *"   # Runs hourly at minute 10
 
-# Avoid overlapping runs (e.g., slow run still running when the next starts)
 concurrency:
   group: sap-automation-${{ github.ref }}
   cancel-in-progress: false
@@ -17,13 +15,9 @@ permissions:
 env:
   TZ: Asia/Riyadh
   PYTHONUNBUFFERED: "1"
-  # If your SAP URL needs explicit client/lang, add them here OR in the secret:
-  # SAP_URL will be read from secrets; example format you can use:
-  # https://your.company.com/sap/bc/gui/sap/its/webgui?sap-client=100&sap-language=EN
 
 jobs:
   run:
-    # Pin a known-good image first; upgrade to 24.04 later after verifying
     runs-on: ubuntu-22.04
     timeout-minutes: 45
 
@@ -44,7 +38,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install Chrome (pinned action)
+      - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
 
       - name: Show versions (debug)
@@ -54,22 +48,16 @@ jobs:
           chrome --version || google-chrome --version || chromium --version || true
 
       - name: Install Python dependencies
-        run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # If a recent Selenium bump caused issues, temporarily pin like:
-          # pip install "selenium==4.25.*"
+        run: pip install -r requirements.txt
 
       - name: Verify required secrets
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
         run: |
           missing=0
-          for v in SAP_USERNAME SAP_PASSWORD SENDER_EMAIL EMAIL_PASSWORD RECIPIENT_EMAIL SAP_URL; do
+          for v in SAP_USERNAME SAP_PASSWORD SAP_URL; do
             if [ -z "${!v}" ]; then
               echo "::error::Missing required secret: $v"
               missing=1
@@ -78,30 +66,19 @@ jobs:
           exit $missing
 
       - name: Prepare artifact folders
-        run: |
-          mkdir -p artifacts screenshots logs
+        run: mkdir -p artifacts screenshots logs
 
-      # === Your main run ===
-      # If automation.py already takes screenshots on failure into ./screenshots,
-      # they will be uploaded by the next step.
       - name: Run automation.py
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
+          DISPLAY: ":99"
         run: |
-          set -e
-          # Use a virtual display if your script needs it
           Xvfb :99 -screen 0 1920x1080x24 &
-          export DISPLAY=:99
-
-          # Run your script; tee logs for artifacts
+          set -e
           python automation.py 2>&1 | tee logs/run.log
 
-      # Always collect whatever the script produced
       - name: Upload artifacts (screenshots/logs)
         if: always()
         uses: actions/upload-artifact@v4
@@ -112,11 +89,3 @@ jobs:
             screenshots/**
             logs/**
           if-no-files-found: ignore
-
-      # Optional: Enable for live SSH debugging when a run fails.
-      # Remember to remove or keep it commented when not needed.
-      # - name: Debug via tmate (optional)
-      #   if: failure()
-      #   uses: mxschmitt/action-tmate@v3
-      #   with:
-      #     limit-access-to-actor: true
