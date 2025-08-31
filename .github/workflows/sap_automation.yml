@@ -1,45 +1,65 @@
-# .github/workflows/sap_automation.yml
-name: SAP Automation
+name: SAP Automation (stable + diagnostics)
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"  # Hourly execution
-  workflow_dispatch:      # Manual trigger
+    # Keep your schedule; example below runs hourly at minute 10
+    - cron: "10 * * * *"
+
+# Avoid overlapping runs (e.g., slow run still running when the next starts)
+concurrency:
+  group: sap-automation-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TZ: Asia/Riyadh
+  PYTHONUNBUFFERED: "1"
+  # If your SAP URL needs explicit client/lang, add them here OR in the secret:
+  # SAP_URL will be read from secrets; example format you can use:
+  # https://your.company.com/sap/bc/gui/sap/its/webgui?sap-client=100&sap-language=EN
 
 jobs:
-  execute-job:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+  run:
+    # Pin a known-good image first; upgrade to 24.04 later after verifying
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
 
     steps:
-      # 1. Check out the repository code
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set up Python environment
-      - name: Set up Python 3.10
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.11"
 
-      # 3. Install Chrome and Matching ChromeDriver using a dedicated action
-      - name: Set up Chrome and ChromeDriver
-        uses: browser-actions/setup-chrome@latest
-        id: setup-chrome
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      # 4. Install required Python packages
-      - name: Install Python packages
+      - name: Install Chrome (pinned action)
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Show versions (debug)
         run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-             pip install -r requirements.txt
-          else
-             echo "requirements.txt not found, installing selenium directly"
-             pip install selenium
-          fi
+          python -V
+          pip --version
+          chrome --version || google-chrome --version || chromium --version || true
 
-      # 5. Run the automation script
-      - name: Run Automation
+      - name: Install Python dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # If a recent Selenium bump caused issues, temporarily pin like:
+          # pip install "selenium==4.25.*"
+
+      - name: Verify required secrets
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
@@ -48,29 +68,55 @@ jobs:
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
           SAP_URL: ${{ secrets.SAP_URL }}
         run: |
-          echo "--- Verifying Versions ---"
-          google-chrome --version
-          chromedriver --version
-          echo "--------------------------"
+          missing=0
+          for v in SAP_USERNAME SAP_PASSWORD SENDER_EMAIL EMAIL_PASSWORD RECIPIENT_EMAIL SAP_URL; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing required secret: $v"
+              missing=1
+            fi
+          done
+          exit $missing
 
-          echo "--- Running Python Script ---"
-          set -x
-          python automation.py || { echo 'Automation script failed'; exit 1; }
-          set +x
-          echo "---------------------------"
+      - name: Prepare artifact folders
+        run: |
+          mkdir -p artifacts screenshots logs
 
-      # 6. Upload failure screenshots on error
-      - name: Upload failure screenshots
-        if: failure() # Only run this step if the workflow failed
+      # === Your main run ===
+      # If automation.py already takes screenshots on failure into ./screenshots,
+      # they will be uploaded by the next step.
+      - name: Run automation.py
+        env:
+          SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
+          SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SAP_URL: ${{ secrets.SAP_URL }}
+        run: |
+          set -e
+          # Use a virtual display if your script needs it
+          Xvfb :99 -screen 0 1920x1080x24 &
+          export DISPLAY=:99
+
+          # Run your script; tee logs for artifacts
+          python automation.py 2>&1 | tee logs/run.log
+
+      # Always collect whatever the script produced
+      - name: Upload artifacts (screenshots/logs)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: failure-screenshots
-          path: | # Upload multiple patterns
-            login_failure_attempt_*.png
-            login_error_attempt_*.png
-            login_ambiguous_state_*.png
-            critical_error_main.png   # <<<--- CORRECTED FILENAME HERE
-            careers_site_click_error.png # Added potential new screenshot
-            final_state_report.png    # Upload final state if it gets that far before error
-          retention-days: 7
-          if-no-files-found: warn # Keep warning if some files don't exist
+          name: sap-artifacts
+          path: |
+            artifacts/**
+            screenshots/**
+            logs/**
+          if-no-files-found: ignore
+
+      # Optional: Enable for live SSH debugging when a run fails.
+      # Remember to remove or keep it commented when not needed.
+      # - name: Debug via tmate (optional)
+      #   if: failure()
+      #   uses: mxschmitt/action-tmate@v3
+      #   with:
+      #     limit-access-to-actor: true
