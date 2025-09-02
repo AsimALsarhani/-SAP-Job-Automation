@@ -1,9 +1,9 @@
-name: SAP Automation (stable + diagnostics)
+name: SAP Automation (SAP_URL only)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "10 * * * *"   # Runs hourly at minute 10
+    - cron: "10 * * * *"   # hourly at :10
 
 concurrency:
   group: sap-automation-${{ github.ref }}
