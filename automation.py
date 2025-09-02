@@ -3,17 +3,20 @@ import sys
 import time
 import pathlib
 import traceback
-from typing import Optional
+from typing import Optional, List
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
 # === Config from Secrets ===
-SAP_URL      = os.getenv("SAP_URL", "").strip()        # Must include sap-client/lang if required
+SAP_URL      = os.getenv("SAP_URL", "").strip()        # include sap-client/lang if required
 SAP_USERNAME = os.getenv("SAP_USERNAME", "").strip()
 SAP_PASSWORD = os.getenv("SAP_PASSWORD", "").strip()
+ALLOW_INSECURE = os.getenv("ALLOW_INSECURE_CERTS", "").lower() in {"1","true","yes","on"}
 
 ARTIFACTS   = pathlib.Path("artifacts");   ARTIFACTS.mkdir(exist_ok=True, parents=True)
 SCREENSHOTS = pathlib.Path("screenshots"); SCREENSHOTS.mkdir(exist_ok=True, parents=True)
@@ -33,7 +36,7 @@ def assert_not_auth_error(driver, tag: str):
         dump_artifacts(driver, tag or "auth-error")
         raise SystemExit("SAP authorization error – see artifacts for URL/HTML.")
 
-def first_present(driver, selectors: list[tuple], timeout=15) -> Optional[tuple]:
+def first_present(driver, selectors: List[tuple], timeout=15) -> Optional[tuple]:
     wait = WebDriverWait(driver, timeout)
     for by, sel in selectors:
         try: return wait.until(EC.presence_of_element_located((by, sel))), (by, sel)
@@ -46,26 +49,57 @@ def make_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1920,1080")
-    return webdriver.Chrome(options=opts)
+    # If TLS via corporate CA blocks navigation, allow insecure certs (toggle by secret)
+    if ALLOW_INSECURE:
+        opts.add_argument("--ignore-certificate-errors")
+        opts.add_argument("--allow-insecure-localhost")
+    driver = webdriver.Chrome(options=opts)
+    if ALLOW_INSECURE:
+        try:
+            driver.capabilities["acceptInsecureCerts"] = True
+        except Exception:
+            pass
+    return driver
 
 def login_to_sap(driver):
     if not (SAP_URL and SAP_USERNAME and SAP_PASSWORD):
         raise SystemExit("Missing SAP_URL/SAP_USERNAME/SAP_PASSWORD secrets.")
 
-    driver.get(SAP_URL)
+    # Wrap driver.get with explicit timeout handling to capture artifacts on hang
+    try:
+        driver.set_page_load_timeout(120)
+        driver.get(SAP_URL)
+    except Exception as e:
+        # Capture as much as possible even if get() timed out
+        dump_artifacts(driver, "00_get_timeout")
+        raise
+
     WebDriverWait(driver, 30).until(lambda d: d.execute_script("return document.readyState")=="complete")
     dump_artifacts(driver, "01_loaded_login")
     assert_not_auth_error(driver, "01_loaded_login")
 
-    user_fields = [(By.ID,"sap-user"),(By.NAME,"sap-user"),(By.CSS_SELECTOR,"input[name='j_username']")]
-    pass_fields = [(By.ID,"sap-password"),(By.NAME,"sap-password"),(By.CSS_SELECTOR,"input[name='j_password']")]
-    login_btns  = [(By.ID,"LOGON_BUTTON"),(By.ID,"sap-login-submit"),(By.CSS_SELECTOR,"button[type='submit']")]
+    user_fields = [
+        (By.ID,"sap-user"), (By.NAME,"sap-user"),
+        (By.CSS_SELECTOR,"input[name='j_username']"),
+        (By.ID,"USERNAME_FIELD"), (By.CSS_SELECTOR,"input[type='text']")
+    ]
+    pass_fields = [
+        (By.ID,"sap-password"), (By.NAME,"sap-password"),
+        (By.CSS_SELECTOR,"input[name='j_password']"),
+        (By.ID,"PASSWORD_FIELD"), (By.CSS_SELECTOR,"input[type='password']")
+    ]
+    login_btns  = [
+        (By.ID,"LOGON_BUTTON"), (By.ID,"sap-login-submit"),
+        (By.CSS_SELECTOR,"button[type='submit']"),
+        (By.XPATH,"//button[contains(., 'Logon') or contains(., 'Login')]"),
+        (By.XPATH,"//input[@type='submit' or @value='Logon' or @value='Login')]")
+    ]
 
     u = first_present(driver, user_fields, timeout=20)
     p = first_present(driver, pass_fields, timeout=20)
     if not (u and p):
         dump_artifacts(driver, "02_login_fields_not_found")
-        raise SystemExit("Could not find username/password fields – check SSO/VPN requirements.")
+        raise SystemExit("Could not find username/password fields – check SSO/VPN requirements or page layout.")
 
     u[0].clear(); u[0].send_keys(SAP_USERNAME)
     p[0].clear(); p[0].send_keys(SAP_PASSWORD)
