@@ -1,9 +1,9 @@
-name: SAP Automation (SAP_URL only, stable Chrome + connectivity check)
+name: SAP Automation (with proof screenshots)
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "10 * * * *"   # hourly at :10
+    - cron: "0 * * * *"   # hourly
+  workflow_dispatch:
 
 concurrency:
   group: sap-automation-${{ github.ref }}
@@ -17,42 +17,34 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
-  run:
+  execute-job:
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      # Use STABLE Chrome instead of Canary Chromium
-      - name: Install Google Chrome (stable)
+      # Use stable Google Chrome (not canary) to avoid sporadic Selenium issues
+      - name: Set up Chrome (stable)
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
           install-dependencies: true
 
-      - name: Show versions (debug)
+      - name: Install Python packages
         run: |
-          python -V
-          pip --version
-          chrome --version || google-chrome --version || chromium --version || true
-
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+             pip install -r requirements.txt
+          else
+             pip install selenium
+          fi
 
       - name: Verify required secrets
         env:
@@ -69,49 +61,39 @@ jobs:
           done
           exit $missing
 
-      # Quick network preflight so you immediately see if the runner can reach SAP_URL
-      - name: Connectivity check to SAP_URL host
-        env:
-          SAP_URL: ${{ secrets.SAP_URL }}
-        run: |
-          set -e
-          python - <<'PY'
-          import os, sys, urllib.parse, subprocess
-          url = os.environ["SAP_URL"]
-          host = urllib.parse.urlparse(url).hostname
-          if not host:
-            print("Could not parse host from SAP_URL", file=sys.stderr); sys.exit(1)
-          print(f"Checking reachability to host: {host}")
-          # DNS + TCP (curl HEAD, 15s) — this will NOT leak headers/body
-          rc = subprocess.call(["curl","-I","--max-time","15","--silent","--show-error", f"https://{host}"])
-          if rc != 0:
-            print("⚠️ Host not reachable from GitHub runner (VPN/SSO/WAF likely required).", file=sys.stderr)
-            sys.exit(0)  # don't fail yet; script will still run and capture artifacts
-          PY
-
-      - name: Prepare artifact folders
+      - name: Prepare folders
         run: mkdir -p artifacts screenshots logs
 
-      - name: Run automation.py
+      - name: Run Automation
         env:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
           SAP_URL: ${{ secrets.SAP_URL }}
-          # Set this to 'true' in repo secrets if your TLS is via corp CA
-          ALLOW_INSECURE_CERTS: ${{ secrets.ALLOW_INSECURE_CERTS }}
+          # Optional email (set all to enable):
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          SENDER_EMAIL:     ${{ secrets.SENDER_EMAIL }}
+          EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
+          RECIPIENT_EMAIL:  ${{ secrets.RECIPIENT_EMAIL }}
           DISPLAY: ":99"
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
+          echo "--- Versions ---"
+          python -V
+          google-chrome --version || chrome --version || chromium --version
+          echo "---------------"
           set -e
           python automation.py 2>&1 | tee logs/run.log
 
-      - name: Upload artifacts (screenshots/logs)
+      # ALWAYS upload artifacts so you get the proof screenshots even on success
+      - name: Upload artifacts (proof + logs)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sap-artifacts
+          name: sap-proof
           path: |
-            artifacts/**
             screenshots/**
+            artifacts/**
             logs/**
-          if-no-files-found: ignore
+          if-no-files-found: warn
+          retention-days: 14
