@@ -1,4 +1,4 @@
-name: SAP Automation (SAP_URL only)
+name: SAP Automation (SAP_URL only, stable Chrome + connectivity check)
 
 on:
   workflow_dispatch:
@@ -38,8 +38,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install Chrome
+      # Use STABLE Chrome instead of Canary Chromium
+      - name: Install Google Chrome (stable)
         uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
 
       - name: Show versions (debug)
         run: |
@@ -65,6 +69,26 @@ jobs:
           done
           exit $missing
 
+      # Quick network preflight so you immediately see if the runner can reach SAP_URL
+      - name: Connectivity check to SAP_URL host
+        env:
+          SAP_URL: ${{ secrets.SAP_URL }}
+        run: |
+          set -e
+          python - <<'PY'
+          import os, sys, urllib.parse, subprocess
+          url = os.environ["SAP_URL"]
+          host = urllib.parse.urlparse(url).hostname
+          if not host:
+            print("Could not parse host from SAP_URL", file=sys.stderr); sys.exit(1)
+          print(f"Checking reachability to host: {host}")
+          # DNS + TCP (curl HEAD, 15s) — this will NOT leak headers/body
+          rc = subprocess.call(["curl","-I","--max-time","15","--silent","--show-error", f"https://{host}"])
+          if rc != 0:
+            print("⚠️ Host not reachable from GitHub runner (VPN/SSO/WAF likely required).", file=sys.stderr)
+            sys.exit(0)  # don't fail yet; script will still run and capture artifacts
+          PY
+
       - name: Prepare artifact folders
         run: mkdir -p artifacts screenshots logs
 
@@ -73,6 +97,8 @@ jobs:
           SAP_USERNAME: ${{ secrets.SAP_USERNAME }}
           SAP_PASSWORD: ${{ secrets.SAP_PASSWORD }}
           SAP_URL: ${{ secrets.SAP_URL }}
+          # Set this to 'true' in repo secrets if your TLS is via corp CA
+          ALLOW_INSECURE_CERTS: ${{ secrets.ALLOW_INSECURE_CERTS }}
           DISPLAY: ":99"
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
